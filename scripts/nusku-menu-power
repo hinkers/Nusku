@@ -6,11 +6,11 @@ menu() { rofi -dmenu -i -p "$1" -theme nusku "${@:2}"; }
 
 confirm() {
     local ans
-    ans="$(printf 'No\nYes\n' | menu "$1?" -lines 2)" || return 1
+    ans="$(printf 'No\nYes\n' | menu "$1?" -theme-str 'listview { lines: 2; }')" || return 1
     [ "$ans" = "Yes" ]
 }
 
-choice="$(printf 'Lock\nLogout\nSuspend\nReboot\nShutdown\n' | menu "Power" -lines 5)" || exit 0
+choice="$(printf 'Lock\nLogout\nSuspend\nReboot\nShutdown\n' | menu "Power" -theme-str 'listview { lines: 5; }')" || exit 0
 
 case "$choice" in
     Lock) hyprlock ;;
