@@ -146,7 +146,9 @@ user_dirs_setup() {
 # gtk_apply_settings: best-effort gsettings (needs a session bus; settings.ini covers the rest).
 gtk_apply_settings() {
     local accent="${1:-blue}"
-    if ! command -v gsettings >/dev/null 2>&1 ||
+    # Without a session bus, gsettings get still reads schema defaults but set never persists.
+    if [ -z "${DBUS_SESSION_BUS_ADDRESS:-}" ] ||
+        ! command -v gsettings >/dev/null 2>&1 ||
         ! gsettings get org.gnome.desktop.interface gtk-theme >/dev/null 2>&1; then
         log_warn "No gsettings or session bus; skipping gsettings (settings.ini still applies)"
         return 0

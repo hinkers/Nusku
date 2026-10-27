@@ -133,10 +133,20 @@ in_sub() {
     [[ "$output" == *"skipping"* ]]
 }
 
+@test "gtk_apply_settings skips when gsettings works but there is no session bus" {
+    # gsettings get answers from schema defaults without a bus; set would only warn and not persist.
+    printf '#!/bin/sh\necho "gsettings $*" >>"$CALLS"\n' >"$STUBS/gsettings"
+    chmod +x "$STUBS/gsettings"
+    DBUS_SESSION_BUS_ADDRESS= run in_sub "gtk_apply_settings mauve"
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"skipping"* ]]
+    [ "$(grep -c 'gsettings set' "$CALLS")" -eq 0 ]
+}
+
 @test "gtk_apply_settings sets values when gsettings works" {
     printf '#!/bin/sh\necho "gsettings $*" >>"$CALLS"\n' >"$STUBS/gsettings"
     chmod +x "$STUBS/gsettings"
-    run in_sub "gtk_apply_settings mauve"
+    DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/1000/bus run in_sub "gtk_apply_settings mauve"
     grep -q 'cursor-theme catppuccin-mocha-mauve-cursors' "$CALLS"
     grep -q 'color-scheme prefer-dark' "$CALLS"
 }

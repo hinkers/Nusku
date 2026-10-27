@@ -74,10 +74,64 @@ in_sub() {
 
 @test "aur_bootstrap clones the -bin repo and runs makepkg" {
     printf '#!/bin/sh\necho "git $*" >>"$CALLS"\nfor last; do :; done\nmkdir -p "$last"\n' >"$STUBS/git"
-    printf '#!/bin/sh\necho "makepkg $*" >>"$CALLS"\n' >"$STUBS/makepkg"
-    chmod +x "$STUBS/git" "$STUBS/makepkg"
+    fake_makepkg 'exit 0'
+    chmod +x "$STUBS/git"
     run in_sub "aur_bootstrap yay"
     [ "$status" -eq 0 ]
     grep -q 'git clone https://aur.archlinux.org/yay-bin.git ' "$CALLS"
     grep -q 'makepkg -si --noconfirm' "$CALLS"
+    [ "$(grep -c 'git clone' "$CALLS")" -eq 1 ]
+}
+
+# fake_makepkg BIN_BODY [SRC_BODY]: makepkg stub that "installs" $HELPER (default yay) whose
+# body is BIN_BODY when building a -bin package and SRC_BODY (default exit 0) otherwise.
+fake_makepkg() {
+    cat >"$STUBS/makepkg" <<STUB
+#!/bin/sh
+echo "makepkg \$*" >>"\$CALLS"
+case "\$(basename "\$PWD")" in
+    *-bin) body='$1' ;;
+    *) body='${2:-exit 0}' ;;
+esac
+name="\$(basename "\$PWD")"
+printf '#!/bin/sh\n%s\n' "\$body" >"$STUBS/\${name%-bin}"
+chmod +x "$STUBS/\${name%-bin}"
+STUB
+    chmod +x "$STUBS/makepkg"
+}
+
+@test "aur_bootstrap falls back to a source build when the -bin helper does not run" {
+    printf '#!/bin/sh\necho "git $*" >>"$CALLS"\nfor last; do :; done\nmkdir -p "$last"\n' >"$STUBS/git"
+    fake_makepkg 'exit 127'
+    printf '#!/bin/sh\necho "pacman $*" >>"$CALLS"\n' >"$STUBS/pacman"
+    printf '#!/bin/sh\necho "sudo $*" >>"$CALLS"\n' >"$STUBS/sudo"
+    chmod +x "$STUBS/git" "$STUBS/pacman" "$STUBS/sudo"
+    run in_sub "aur_bootstrap paru"
+    [ "$status" -eq 0 ]
+    grep -q 'git clone https://aur.archlinux.org/paru-bin.git ' "$CALLS"
+    grep -q 'sudo pacman -Rdd --noconfirm paru-bin' "$CALLS"
+    grep -q 'git clone https://aur.archlinux.org/paru.git ' "$CALLS"
+    [[ "$output" == *"building it from source"* ]]
+}
+
+@test "aur_bootstrap rebuilds from source when an installed helper is broken" {
+    printf '#!/bin/sh\nexit 127\n' >"$STUBS/paru"
+    printf '#!/bin/sh\necho "git $*" >>"$CALLS"\nfor last; do :; done\nmkdir -p "$last"\n' >"$STUBS/git"
+    fake_makepkg 'exit 127'
+    printf '#!/bin/sh\nexit 1\n' >"$STUBS/pacman"
+    chmod +x "$STUBS/paru" "$STUBS/git" "$STUBS/pacman"
+    run in_sub "aur_bootstrap paru"
+    [ "$status" -eq 0 ]
+    grep -q 'git clone https://aur.archlinux.org/paru.git ' "$CALLS"
+    [ "$(grep -c 'paru-bin' "$CALLS")" -eq 0 ]
+}
+
+@test "aur_bootstrap dies if the source-built helper still does not run" {
+    printf '#!/bin/sh\necho "git $*" >>"$CALLS"\nfor last; do :; done\nmkdir -p "$last"\n' >"$STUBS/git"
+    fake_makepkg 'exit 127' 'exit 127'
+    printf '#!/bin/sh\nexit 1\n' >"$STUBS/pacman"
+    chmod +x "$STUBS/git" "$STUBS/pacman"
+    run in_sub "aur_bootstrap yay"
+    [ "$status" -ne 0 ]
+    [[ "$output" == *"still does not run"* ]]
 }
