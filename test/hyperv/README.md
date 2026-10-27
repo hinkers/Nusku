@@ -16,7 +16,10 @@ Sign out and back in. The OpenSSH client is built into Windows. Create a key
 if you do not have one:
 
 ```powershell
-if (-not (Test-Path $HOME\.ssh\nusku_test)) { ssh-keygen -t ed25519 -f $HOME\.ssh\nusku_test -N '""' }
+New-Item -ItemType Directory -Force "$HOME\.ssh" | Out-Null
+if (-not (Test-Path "$HOME\.ssh
+usku_test")) { ssh-keygen -t ed25519 -f "$HOME\.ssh
+usku_test" -N '""' }
 ```
 
 ## 2. Create the VM
@@ -44,33 +47,45 @@ the intent is:
 - Additional packages: `openssh git sudo hyperv`
 - Network configuration: NetworkManager
 
-Install, then reboot (do not chroot). After first boot, log in as `tester`:
+When archinstall finishes, **power off** (do not reboot, or the live ISO boots
+again). On the host, eject the ISO and boot from the disk:
+
+```powershell
+Set-VMDvdDrive -VMName nusku-test -Path $null
+Set-VMFirmware -VMName nusku-test -FirstBootDevice (Get-VMHardDiskDrive -VMName nusku-test)
+Start-VM -Name nusku-test
+```
+
+Log in as `tester` and run:
 
 ```bash
 sudo systemctl enable --now sshd hv_kvp_daemon hv_vss_daemon
 # Test VM only: passwordless sudo for the automated loop
-echo 'tester ALL=(ALL) NOPASSWD: ALL' | sudo tee /etc/sudoers.d/10-tester
+sudo install -m 440 /dev/stdin /etc/sudoers.d/10-tester <<<'tester ALL=(ALL) NOPASSWD: ALL'
+sudo visudo -c
 mkdir -p ~/.ssh && chmod 700 ~/.ssh
 ```
 
-Put the host's public key in `~/.ssh/authorized_keys` — paste it
-(`Get-Content $HOME\.ssh\nusku_test.pub` on the host), or from the host once the
-VM has an IP (`(Get-VMNetworkAdapter -VMName nusku-test).IPAddresses`):
+Put the host's public key in `~/.ssh/authorized_keys`: paste it
+(`Get-Content "$HOME\.ssh
+usku_test.pub"` on the host), or copy it from the
+host once the VM has an IP. `IPAddresses` also lists IPv6; use the IPv4 one:
 
 ```powershell
-scp -i $HOME\.ssh\nusku_test $HOME\.ssh\nusku_test.pub tester@<ip>:/tmp/k.pub
+(Get-VMNetworkAdapter -VMName nusku-test).IPAddresses
+scp "$HOME\.ssh
+usku_test.pub" tester@<ip>:/tmp/k.pub
 # in the VM: cat /tmp/k.pub >> ~/.ssh/authorized_keys && chmod 600 ~/.ssh/authorized_keys
 ```
 
-Check from the host: `ssh -i $HOME\.ssh\nusku_test tester@<ip> true`.
+Check from the host: `ssh -i "$HOME\.ssh
+usku_test" tester@<ip> true`.
 
 ## 4. Checkpoint
 
 Shut the VM down (`sudo poweroff`), then on the host:
 
 ```powershell
-Set-VMDvdDrive -VMName nusku-test -Path $null
-Set-VMFirmware -VMName nusku-test -FirstBootDevice (Get-VMHardDiskDrive -VMName nusku-test)
 Checkpoint-VM -Name nusku-test -SnapshotName clean-arch
 ```
 

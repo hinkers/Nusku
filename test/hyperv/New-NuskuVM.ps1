@@ -37,6 +37,10 @@ function Stop-Friendly([string]$Message) {
 }
 
 # --- Permissions -----------------------------------------------------------
+if (-not (Get-Command Get-VM -ErrorAction SilentlyContinue)) {
+    Stop-Friendly "Hyper-V PowerShell module not found. Enable the 'Microsoft-Hyper-V-All' Windows feature and reboot."
+}
+
 $identity = [Security.Principal.WindowsIdentity]::GetCurrent()
 $principal = New-Object Security.Principal.WindowsPrincipal($identity)
 $isAdmin = $principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
@@ -56,10 +60,6 @@ if (-not (Test-Path -LiteralPath $IsoPath -PathType Leaf)) {
 }
 $IsoPath = (Resolve-Path -LiteralPath $IsoPath).ProviderPath
 
-if (-not (Get-Command Get-VM -ErrorAction SilentlyContinue)) {
-    Stop-Friendly "Hyper-V PowerShell module not found. Enable the 'Microsoft-Hyper-V-All' Windows feature and reboot."
-}
-
 if (-not (Get-VMSwitch -Name 'Default Switch' -ErrorAction SilentlyContinue)) {
     Stop-Friendly "The 'Default Switch' virtual switch does not exist. It is created by Hyper-V on Windows 10/11; try rebooting, or check that the Hyper-V feature is fully enabled."
 }
@@ -68,18 +68,28 @@ $vhdPath = Join-Path (Get-VMHost).VirtualHardDiskPath "$Name.vhdx"
 
 $existing = Get-VM -Name $Name -ErrorAction SilentlyContinue
 if ($existing) {
+    $oldDisks = @(Get-VMHardDiskDrive -VM $existing | ForEach-Object { $_.Path })
     if (-not $Force) {
         Write-Host "A VM named '$Name' already exists." -ForegroundColor Yellow
-        $answer = Read-Host "Remove it and its disk ($vhdPath) and recreate? [y/N]"
+        $answer = Read-Host "Remove it and its disk(s) ($($oldDisks -join ', ')) and recreate? [y/N]"
         if ($answer -notmatch '^(y|yes)$') {
             Stop-Friendly "Aborted. Use a different -Name, or pass -Force to recreate."
         }
     }
-    if ($existing.State -ne 'Off') { Stop-VM -Name $Name -TurnOff -Force }
+    if ($existing.State -in 'Running', 'Paused') { Stop-VM -Name $Name -TurnOff -Force }
     Get-VMSnapshot -VMName $Name -ErrorAction SilentlyContinue | Remove-VMSnapshot
+    # Wait (up to ~2 min) for any snapshot merge to finish before deleting disks.
+    for ($i = 0; $i -lt 60; $i++) {
+        $vmNow = Get-VM -Name $Name
+        if ($vmNow.Status -notmatch 'Merging') { break }
+        Start-Sleep -Seconds 2
+    }
     Remove-VM -Name $Name -Force
-    if (Test-Path -LiteralPath $vhdPath) { Remove-Item -LiteralPath $vhdPath -Force }
-} elseif (Test-Path -LiteralPath $vhdPath) {
+    foreach ($d in $oldDisks) {
+        if ($d -and (Test-Path -LiteralPath $d)) { Remove-Item -LiteralPath $d -Force }
+    }
+}
+if (Test-Path -LiteralPath $vhdPath) {
     Stop-Friendly "Disk already exists but no VM '$Name' owns it: $vhdPath. Delete it manually or pick another -Name."
 }
 
