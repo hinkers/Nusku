@@ -52,14 +52,18 @@ gpu_vm_services() {
 # gpu_package_lists GPU NVIDIA_MODULE VIRT: list file paths, one per line.
 gpu_package_lists() {
     local gpu="${1:-}" mod="${2:-proprietary}" virt="${3:-none}"
-    local dir="$NUSKU_ROOT/packages" nv
-    if [ "$mod" = "open" ]; then nv="gpu-nvidia-open"; else nv="gpu-nvidia"; fi
+    local dir="$NUSKU_ROOT/packages" nvl=()
+    if [ "$mod" = "open" ]; then
+        nvl=("$dir/gpu-nvidia-open.pacman")
+    else
+        nvl=("$dir/gpu-nvidia.pacman" "$dir/gpu-nvidia.aur")
+    fi
     case "$gpu" in
         amd) echo "$dir/gpu-amd.pacman" ;;
         intel) echo "$dir/gpu-intel.pacman" ;;
-        nvidia) echo "$dir/$nv.pacman" ;;
-        hybrid-intel) printf '%s\n' "$dir/gpu-intel.pacman" "$dir/$nv.pacman" "$dir/gpu-hybrid.pacman" ;;
-        hybrid-amd) printf '%s\n' "$dir/gpu-amd.pacman" "$dir/$nv.pacman" "$dir/gpu-hybrid.pacman" ;;
+        nvidia) printf '%s\n' "${nvl[@]}" ;;
+        hybrid-intel) printf '%s\n' "$dir/gpu-intel.pacman" "${nvl[@]}" "$dir/gpu-hybrid.pacman" ;;
+        hybrid-amd) printf '%s\n' "$dir/gpu-amd.pacman" "${nvl[@]}" "$dir/gpu-hybrid.pacman" ;;
         vm)
             case "$virt" in
                 microsoft) echo "$dir/gpu-vm-hyperv.pacman" ;;
@@ -118,7 +122,7 @@ _gpu_edit_etc() {
 
 # gpu_configure: install drivers, edit boot config, write gpu.conf, using the answers.
 gpu_configure() {
-    local gpu mod virt lists=() names=() n rc
+    local gpu mod virt lists=() n rc
     gpu="$(answers_get GPU)"
     mod="$(answers_get NVIDIA_MODULE)"
     virt="$(gpu_virt)"
@@ -126,8 +130,21 @@ gpu_configure() {
 
     while IFS= read -r n; do lists+=("$n"); done < <(gpu_package_lists "$gpu" "${mod:-proprietary}" "$virt")
     [ "${#lists[@]}" -gt 0 ] || die "No package lists for GPU '$gpu'"
-    while IFS= read -r n; do names+=("$n"); done < <(pkg_read_list "${lists[@]}")
-    pkg_install_repo "${names[@]}"
+    local repo_lists=() aur_lists=() repo_names=() aur_names=()
+    for n in "${lists[@]}"; do
+        case "$n" in
+            *.aur) aur_lists+=("$n") ;;
+            *) repo_lists+=("$n") ;;
+        esac
+    done
+    if [ "${#repo_lists[@]}" -gt 0 ]; then
+        while IFS= read -r n; do repo_names+=("$n"); done < <(pkg_read_list "${repo_lists[@]}")
+    fi
+    if [ "${#aur_lists[@]}" -gt 0 ]; then
+        while IFS= read -r n; do aur_names+=("$n"); done < <(pkg_read_list "${aur_lists[@]}")
+    fi
+    pkg_install_repo "${repo_names[@]}"
+    pkg_install_aur "${aur_names[@]}"
 
     case "$gpu" in
         nvidia | hybrid-*)

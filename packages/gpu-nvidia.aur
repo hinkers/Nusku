@@ -1,0 +1,3 @@
+# Legacy proprietary NVIDIA driver (GTX 10xx / Pascal and older), 580xx branch from the AUR.
+nvidia-580xx-dkms
+nvidia-580xx-utils

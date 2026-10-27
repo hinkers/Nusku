@@ -26,7 +26,7 @@ in_sub() {
 
 @test "gpu_package_lists hybrid-amd proprietary" {
     run in_sub "gpu_package_lists hybrid-amd proprietary none | xargs -n1 basename | tr '\n' ' '"
-    [ "$output" = "gpu-amd.pacman gpu-nvidia.pacman gpu-hybrid.pacman " ]
+    [ "$output" = "gpu-amd.pacman gpu-nvidia.pacman gpu-nvidia.aur gpu-hybrid.pacman " ]
 }
 
 @test "gpu_package_lists vm microsoft = vm-hyperv" {
@@ -45,9 +45,11 @@ in_sub() {
     [ "$output" = "gpu-vm-generic.pacman" ]
 }
 
-@test "gpu_package_lists nvidia proprietary has an nvidia dkms driver, no prime" {
+@test "gpu_package_lists nvidia proprietary includes the AUR legacy list, no repo nvidia-utils, no prime" {
     run in_sub 'pkg_read_list $(gpu_package_lists nvidia proprietary none)'
-    [[ "$output" == *nvidia-open-dkms* ]]
+    ! grep -qx nvidia-utils <<<"$output"
+    [[ "$output" == *nvidia-580xx-dkms* ]]
+    [[ "$output" != *nvidia-open-dkms* ]]
     [[ "$output" != *nvidia-prime* ]]
 }
 
@@ -103,7 +105,7 @@ in_sub() {
     printf 'GRUB_CMDLINE_LINUX_DEFAULT="quiet"\n' >"$BATS_TEST_TMPDIR/grub"
     printf 'MODULES=()\n' >"$BATS_TEST_TMPDIR/mk"
     export NUSKU_GRUB_DEFAULT="$BATS_TEST_TMPDIR/grub" NUSKU_MKINITCPIO_CONF="$BATS_TEST_TMPDIR/mk"
-    run in_sub "answers_set GPU nvidia; answers_set NVIDIA_MODULE proprietary; gpu_configure"
+    run in_sub "answers_set GPU nvidia; answers_set NVIDIA_MODULE open; gpu_configure"
     [ "$status" -eq 0 ]
     grep -q 'nvidia_drm.modeset=1 nvidia_drm.fbdev=1' "$BATS_TEST_TMPDIR/grub"
     grep -qx 'MODULES=(nvidia nvidia_modeset nvidia_uvm nvidia_drm)' "$BATS_TEST_TMPDIR/mk"
@@ -112,7 +114,7 @@ in_sub() {
     [ "$(grep -c '^grub-mkconfig -o /boot/grub/grub.cfg' "$CALLS")" -eq 1 ]
     grep -q NVD_BACKEND "$BATS_TEST_TMPDIR/cfg/nusku/gpu.conf"
     : >"$CALLS"
-    run in_sub "answers_set GPU nvidia; answers_set NVIDIA_MODULE proprietary; gpu_configure"
+    run in_sub "answers_set GPU nvidia; answers_set NVIDIA_MODULE open; gpu_configure"
     [ "$status" -eq 0 ]
     ! grep -q '^mkinitcpio' "$CALLS"
     ! grep -q '^grub-mkconfig' "$CALLS"
@@ -132,4 +134,23 @@ in_sub() {
     [ "$status" -eq 0 ]
     ! grep -q '^mkinitcpio' "$CALLS"
     [ -f "$BATS_TEST_TMPDIR/cfg/nusku/gpu.conf" ]
+}
+
+@test "gpu_package_lists nvidia proprietary includes gpu-nvidia.aur, open does not" {
+    run in_sub "gpu_package_lists nvidia proprietary none"
+    [[ "$output" == *gpu-nvidia.aur* ]]
+    run in_sub "gpu_package_lists nvidia open none"
+    [[ "$output" != *.aur* ]]
+}
+
+@test "gpu_configure proprietary installs repo bits then AUR driver" {
+    printf '#!/bin/sh\necho "paru $*" >>"$CALLS"\n' >"$STUBS/paru"
+    chmod +x "$STUBS/paru"
+    export NUSKU_GRUB_DEFAULT="$BATS_TEST_TMPDIR/nogrub" NUSKU_MKINITCPIO_CONF="$BATS_TEST_TMPDIR/nomk"
+    run in_sub "answers_set GPU nvidia; answers_set NVIDIA_MODULE proprietary; answers_set AUR_HELPER paru; gpu_configure"
+    [ "$status" -eq 0 ]
+    grep -q '^pacman -S --needed --noconfirm egl-wayland' "$CALLS"
+    ! grep -q 'nvidia-utils' "$CALLS" || grep -q 'nvidia-580xx-utils' "$CALLS"
+    grep -q '^paru -S --needed --noconfirm nvidia-580xx-dkms nvidia-580xx-utils' "$CALLS"
+    [ "$(grep -n '^pacman' "$CALLS" | head -1 | cut -d: -f1)" -lt "$(grep -n '^paru' "$CALLS" | head -1 | cut -d: -f1)" ]
 }

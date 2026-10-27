@@ -1,6 +1,4 @@
-# nvidia-dkms (proprietary) no longer exists in the repos; nvidia-open-dkms is the only repo driver.
-nvidia-open-dkms
-nvidia-utils
+# Shared bits for the legacy proprietary driver (GTX 10xx / Pascal and older); the driver itself is in gpu-nvidia.aur.
 egl-wayland
 libva-nvidia-driver
 linux-headers
