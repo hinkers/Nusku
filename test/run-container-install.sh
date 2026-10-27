@@ -47,6 +47,8 @@ fi
 after="$(backups)"
 
 echo "=== update run (saved answers) ==="
+# Simulate an older install: all of ~/.config/btop linked into the repo.
+rm -rf "$HOME/.config/btop" && ln -s /nusku/config/btop "$HOME/.config/btop"
 # Simulate a moved repo: the saved wallpaper path no longer exists.
 printf "*=/nonexistent/old-repo/wallpapers/space.png\n" >"$state/wallpapers"
 if ./install.sh --update --no-reboot; then
@@ -69,6 +71,19 @@ if [ -L "$HOME/.config/hypr" ]; then
     esac
 else
     bad "~/.config/hypr is not a symlink"
+fi
+
+if [ -d "$HOME/.config/btop" ] && [ ! -L "$HOME/.config/btop" ] &&
+    [ "$(readlink "$HOME/.config/btop/themes")" = /nusku/config/btop/themes ] &&
+    [ -f "$HOME/.config/btop/btop.conf" ] && [ ! -L "$HOME/.config/btop/btop.conf" ]; then
+    pass "btop: real dir, themes linked, btop.conf copied"
+else
+    bad "btop layout wrong: $(ls -la "$HOME/.config/btop" 2>&1)"
+fi
+if [ -f /nusku/config/btop/themes/catppuccin_mocha.theme ] && [ -f /nusku/config/btop/btop.conf ]; then
+    pass "repo btop files intact after migrating the old link"
+else
+    bad "repo btop files damaged"
 fi
 
 if grep -q 89b4fa "$HOME/.config/nusku/theme/colors.css" 2>/dev/null; then

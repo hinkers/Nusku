@@ -249,6 +249,13 @@ step_theme() {
 
 step_dotfiles() {
     step "Dotfiles"
+    # Older installs linked all of ~/.config/btop into the repo; btop then rewrote
+    # btop.conf inside the repo. Drop that link so only the themes dir is linked.
+    local btop_dir="$HOME/.config/btop"
+    if [ -L "$btop_dir" ] && [ "$(readlink "$btop_dir")" = "$REPO_ROOT/config/btop" ]; then
+        rm -f "$btop_dir"
+        log_info "Removed old Nusku link $btop_dir"
+    fi
     deploy_dotfiles "$REPO_ROOT"
 }
 
@@ -264,6 +271,13 @@ step_local_files() {
 #   monitor = DP-1, 2560x1440@144, 0x0, 1
 EOF
         log_info "Created $local_conf"
+    fi
+    # btop rewrites its config on exit, so it is a copy (made once), not a link.
+    local btop_conf="$HOME/.config/btop/btop.conf"
+    if [ ! -e "$btop_conf" ] && [ ! -L "$btop_conf" ]; then
+        mkdir -p "$(dirname "$btop_conf")"
+        cp "$REPO_ROOT/config/btop/btop.conf" "$btop_conf"
+        log_info "Created $btop_conf"
     fi
     if [ ! -e "$NUSKU_CONFIG_DIR/gpu.conf" ]; then
         gpu_hypr_conf "$(answers_get GPU)" "$(gpu_virt)" >"$NUSKU_CONFIG_DIR/gpu.conf"
