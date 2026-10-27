@@ -4,8 +4,11 @@
 # pkg_read_list FILE...: package names one per line; comments and blanks stripped; deduped, first-seen order.
 pkg_read_list() {
     local f
+    # Validate first: die inside the pipeline below would only exit its subshell.
     for f in "$@"; do
         [ -r "$f" ] || die "Package list not readable: $f"
+    done
+    for f in "$@"; do
         sed -e 's/#.*$//' -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//' "$f"
     done | awk 'NF && !seen[$0]++'
 }

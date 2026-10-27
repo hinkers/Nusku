@@ -64,3 +64,20 @@ in_sub() {
     run in_sub "aur_bootstrap evil"
     [ "$status" -ne 0 ]
 }
+
+@test "pkg_read_list fails on a missing file and names it" {
+    run in_sub "pkgs=\$(pkg_read_list '$BATS_TEST_TMPDIR/nope.list') || exit 7; echo \"not reached: \$pkgs\""
+    [ "$status" -ne 0 ]
+    [[ "$output" == *"nope.list"* ]]
+    [[ "$output" != *"not reached"* ]]
+}
+
+@test "aur_bootstrap clones the -bin repo and runs makepkg" {
+    printf '#!/bin/sh\necho "git $*" >>"$CALLS"\nfor last; do :; done\nmkdir -p "$last"\n' >"$STUBS/git"
+    printf '#!/bin/sh\necho "makepkg $*" >>"$CALLS"\n' >"$STUBS/makepkg"
+    chmod +x "$STUBS/git" "$STUBS/makepkg"
+    run in_sub "aur_bootstrap yay"
+    [ "$status" -eq 0 ]
+    grep -q 'git clone https://aur.archlinux.org/yay-bin.git ' "$CALLS"
+    grep -q 'makepkg -si --noconfirm' "$CALLS"
+}
