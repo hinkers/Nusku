@@ -64,5 +64,5 @@ in_sub() {
     run in_sub preflight_bootstrap
     [ "$status" -eq 0 ]
     [ "$(wc -l <"$SUDO_ARGS")" -eq 1 ]
-    [ "$(cat "$SUDO_ARGS")" = "pacman -Syu --needed --noconfirm gum jq git base-devel curl" ]
+    [ "$(cat "$SUDO_ARGS")" = "pacman -Syu --needed --noconfirm gum jq git base-devel curl pciutils" ]
 }

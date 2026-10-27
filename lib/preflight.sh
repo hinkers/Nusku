@@ -20,8 +20,8 @@ preflight_checks() {
     log_info "Preflight checks passed"
 }
 
-# Installs the tools the installer itself needs; the -Syu also does a full system upgrade.
+# Installs the tools the installer itself needs (pciutils: lspci for gpu_suggest); the -Syu also does a full system upgrade.
 preflight_bootstrap() {
     step "Installing bootstrap packages"
-    run sudo pacman -Syu --needed --noconfirm gum jq git base-devel curl
+    run sudo pacman -Syu --needed --noconfirm gum jq git base-devel curl pciutils
 }
