@@ -10,7 +10,6 @@
 
   "hyprland/workspaces": {
     "format": "{id}",
-    "on-click": "activate",
     "all-outputs": false
   },
 
@@ -26,7 +25,7 @@
     "calendar": {
       "mode": "month",
       "format": {
-        "months": "<span color='#89b4fa'><b>{}</b></span>",
+        "months": "<b>{}</b>",
         "today": "<b><u>{}</u></b>"
       }
     }
