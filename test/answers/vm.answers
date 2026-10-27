@@ -1,0 +1,4 @@
+GPU=vm
+AUR_HELPER=paru
+ACCENT=blue
+TEST_AUTOLOGIN=1
