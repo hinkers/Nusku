@@ -254,9 +254,14 @@ step_dotfiles() {
     # Older installs linked all of ~/.config/btop into the repo; btop then rewrote
     # btop.conf inside the repo. Drop that link so only the themes dir is linked.
     local btop_dir="$HOME/.config/btop"
-    if [ -L "$btop_dir" ] && [ "$(readlink "$btop_dir")" = "$REPO_ROOT/config/btop" ]; then
-        rm -f "$btop_dir"
-        log_info "Removed old Nusku link $btop_dir"
+    # Any checkout counts (the repo may have moved): linking themes through it would edit that checkout.
+    if [ -L "$btop_dir" ]; then
+        case "$(readlink "$btop_dir")" in
+            */config/btop)
+                rm -f "$btop_dir"
+                log_info "Removed old Nusku link $btop_dir"
+                ;;
+        esac
     fi
     deploy_dotfiles "$REPO_ROOT"
 }
