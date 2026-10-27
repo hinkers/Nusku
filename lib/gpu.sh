@@ -86,8 +86,7 @@ gpu_kernel_headers() {
     esac
     for k in linux linux-lts linux-zen linux-hardened; do
         if pacman -Qq "$k" >/dev/null 2>&1; then
-            printf '%s-headers
-' "$k"
+            printf '%s-headers\n' "$k"
         fi
     done
     return 0

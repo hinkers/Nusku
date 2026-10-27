@@ -52,7 +52,7 @@ setup() {
     mkdir -p "$stubs"
     export SUDO_ARGS="$BATS_TEST_TMPDIR/sudo-args"
     : >"$SUDO_ARGS"
-    printf '#!/usr/bin/env bash\nprintf "%%s\n" "$*" >>"$SUDO_ARGS"\n' >"$stubs/sudo"
+    printf '#!/usr/bin/env bash\necho "$*" >>"$SUDO_ARGS"\n' >"$stubs/sudo"
     printf '#!/usr/bin/env bash\nexit 0\n' >"$stubs/curl"
     chmod +x "$stubs/sudo" "$stubs/curl"
     export NUSKU_ARCH_RELEASE="$BATS_TEST_TMPDIR/arch-release" NUSKU_EUID=1000
@@ -69,7 +69,7 @@ setup() {
     mkdir -p "$stubs"
     export SUDO_ARGS="$BATS_TEST_TMPDIR/sudo-args"
     : >"$SUDO_ARGS"
-    printf '#!/usr/bin/env bash\nprintf "%%s\n" "$*" >>"$SUDO_ARGS"\n' >"$stubs/sudo"
+    printf '#!/usr/bin/env bash\necho "$*" >>"$SUDO_ARGS"\n' >"$stubs/sudo"
     chmod +x "$stubs/sudo"
     PATH="$stubs:$PATH" run ./install.sh --update --no-reboot
     [ "$status" -ne 0 ]
