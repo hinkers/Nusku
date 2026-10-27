@@ -46,3 +46,33 @@ setup() {
     [ "${lines[0]}" = "git -C $fake pull --ff-only" ]
     [ "${lines[1]}" = "install --update" ]
 }
+
+@test "invalid --answers dies before preflight touches the system" {
+    stubs="$BATS_TEST_TMPDIR/stubs"
+    mkdir -p "$stubs"
+    export SUDO_ARGS="$BATS_TEST_TMPDIR/sudo-args"
+    : >"$SUDO_ARGS"
+    printf '#!/usr/bin/env bash\nprintf "%%s\n" "$*" >>"$SUDO_ARGS"\n' >"$stubs/sudo"
+    printf '#!/usr/bin/env bash\nexit 0\n' >"$stubs/curl"
+    chmod +x "$stubs/sudo" "$stubs/curl"
+    export NUSKU_ARCH_RELEASE="$BATS_TEST_TMPDIR/arch-release" NUSKU_EUID=1000
+    : >"$NUSKU_ARCH_RELEASE"
+    printf 'GPU=amd\nAUR_HELPER=paru\nACCENT=banana\n' >"$BATS_TEST_TMPDIR/bad.answers"
+    PATH="$stubs:$PATH" run ./install.sh --answers "$BATS_TEST_TMPDIR/bad.answers" --no-reboot
+    [ "$status" -ne 0 ]
+    [[ "$output" == *"invalid ACCENT='banana'"* ]]
+    [ "$(grep -c pacman "$SUDO_ARGS")" -eq 0 ]
+}
+
+@test "--update without saved answers dies before preflight" {
+    stubs="$BATS_TEST_TMPDIR/stubs"
+    mkdir -p "$stubs"
+    export SUDO_ARGS="$BATS_TEST_TMPDIR/sudo-args"
+    : >"$SUDO_ARGS"
+    printf '#!/usr/bin/env bash\nprintf "%%s\n" "$*" >>"$SUDO_ARGS"\n' >"$stubs/sudo"
+    chmod +x "$stubs/sudo"
+    PATH="$stubs:$PATH" run ./install.sh --update --no-reboot
+    [ "$status" -ne 0 ]
+    [[ "$output" == *"needs saved answers"* ]]
+    [ ! -s "$SUDO_ARGS" ]
+}

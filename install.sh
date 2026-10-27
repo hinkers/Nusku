@@ -155,8 +155,6 @@ step_questions() {
         if [ "$opt_reconfigure" -eq 1 ]; then
             NUSKU_ANSWERS=()
         fi
-    elif [ "$opt_update" -eq 1 ]; then
-        die "--update needs saved answers ($SAVED_ANSWERS); run ./install.sh first"
     fi
 
     local suggested gpu
@@ -190,6 +188,21 @@ step_questions() {
     answers_save "$SAVED_ANSWERS"
     log_info "Answers: GPU=$(answers_get GPU) NVIDIA_MODULE=$(answers_get NVIDIA_MODULE) AUR_HELPER=$(answers_get AUR_HELPER) ACCENT=$(answers_get ACCENT)"
     log_info "Saved answers to $SAVED_ANSWERS"
+}
+
+# check_answers_early: with --answers or --update, load and validate the answers before
+# anything touches the system, so a typo fails fast instead of after a full upgrade.
+check_answers_early() {
+    if [ -n "$opt_answers" ]; then
+        step "Checking answers"
+        answers_load "$opt_answers"
+        answers_validate
+    elif [ "$opt_update" -eq 1 ]; then
+        step "Checking answers"
+        [ -r "$SAVED_ANSWERS" ] || die "--update needs saved answers ($SAVED_ANSWERS); run ./install.sh first"
+        answers_load "$SAVED_ANSWERS"
+        answers_validate
+    fi
 }
 
 step_aur_helper() {
@@ -296,6 +309,7 @@ step_reboot() {
 }
 
 main() {
+    check_answers_early
     preflight_checks
     preflight_bootstrap
     sudo_keepalive
