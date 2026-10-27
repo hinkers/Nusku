@@ -17,9 +17,7 @@ if you do not have one:
 
 ```powershell
 New-Item -ItemType Directory -Force "$HOME\.ssh" | Out-Null
-if (-not (Test-Path "$HOME\.ssh
-usku_test")) { ssh-keygen -t ed25519 -f "$HOME\.ssh
-usku_test" -N '""' }
+if (-not (Test-Path "$HOME\.ssh\nusku_test")) { ssh-keygen -t ed25519 -f "$HOME\.ssh\nusku_test" -N '""' }
 ```
 
 ## 2. Create the VM
@@ -67,19 +65,16 @@ mkdir -p ~/.ssh && chmod 700 ~/.ssh
 ```
 
 Put the host's public key in `~/.ssh/authorized_keys`: paste it
-(`Get-Content "$HOME\.ssh
-usku_test.pub"` on the host), or copy it from the
+(`Get-Content "$HOME\.ssh\nusku_test.pub"` on the host), or copy it from the
 host once the VM has an IP. `IPAddresses` also lists IPv6; use the IPv4 one:
 
 ```powershell
 (Get-VMNetworkAdapter -VMName nusku-test).IPAddresses
-scp "$HOME\.ssh
-usku_test.pub" tester@<ip>:/tmp/k.pub
+scp "$HOME\.ssh\nusku_test.pub" tester@<ip>:/tmp/k.pub
 # in the VM: cat /tmp/k.pub >> ~/.ssh/authorized_keys && chmod 600 ~/.ssh/authorized_keys
 ```
 
-Check from the host: `ssh -i "$HOME\.ssh
-usku_test" tester@<ip> true`.
+Check from the host: `ssh -i "$HOME\.ssh\nusku_test" tester@<ip> true`.
 
 ## 4. Checkpoint
 
