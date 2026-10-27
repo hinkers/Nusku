@@ -166,3 +166,12 @@ make_repo() {
     grep -q 'gtk-cursor-theme-name=catppuccin-mocha-mauve-cursors' "$HOME/.config/gtk-3.0/settings.ini"
     grep -q 'gtk-theme-name=adw-gtk3-dark' "$HOME/.config/gtk-4.0/settings.ini"
 }
+
+@test "nusku-theme logs to one log file and hints at --update for login screen and cursor" {
+    run bash scripts/nusku-theme mauve
+    [ "$status" -eq 0 ]
+    [ "$(find "$XDG_STATE_HOME/nusku" -maxdepth 1 -name 'install-*.log' | wc -l)" -eq 1 ]
+    [[ "$output" == *"login screen"* ]]
+    [[ "$output" == *"cursor"* ]]
+    [[ "$output" == *"nusku-update"* ]]
+}

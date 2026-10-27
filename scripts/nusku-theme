@@ -29,6 +29,8 @@ if [ "$valid" -ne 1 ]; then
     exit 2
 fi
 
+log_init
+
 answers_file="${XDG_CONFIG_HOME:-$HOME/.config}/nusku/answers"
 if [ -r "$answers_file" ]; then
     answers_load "$answers_file"
@@ -48,3 +50,4 @@ if command -v swaync-client >/dev/null 2>&1 && command -v pgrep >/dev/null 2>&1 
     swaync-client -rs >/dev/null 2>&1 || true
 fi
 printf 'Accent set to %s\n' "$accent"
+printf 'The login screen and the GTK cursor follow the new accent after nusku-update (or ./install.sh --update).\n'
