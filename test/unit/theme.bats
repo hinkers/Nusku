@@ -54,7 +54,7 @@ in_sub() {
     run in_sub "answers_set ACCENT teal; theme_render_all '$PWD'"
     [ "$status" -eq 0 ]
     n_tmpl="$(find theme/templates -maxdepth 1 -name '*.tmpl' | wc -l)"
-    n_out="$(find "$XDG_CONFIG_HOME/nusku/theme" -maxdepth 1 -type f | wc -l)"
+    n_out="$(find "$XDG_CONFIG_HOME/nusku/theme" -maxdepth 1 -type f ! -name '.*' | wc -l)"
     [ "$n_tmpl" -ge 6 ]
     [ "$n_out" = "$n_tmpl" ]
     grep -q '94e2d5' "$XDG_CONFIG_HOME/nusku/theme/colors.css"
@@ -147,4 +147,20 @@ make_repo() {
     [ "$status" -ne 0 ]
     [ "$(cat "$HOME/.a-first")" = "keep" ]
     [ ! -e "$XDG_CONFIG_HOME/nusku/theme/top.conf" ]
+}
+
+@test "render_all renders Kvantum theme, cursor env and GTK settings for the accent" {
+    run in_sub "answers_set ACCENT mauve; theme_render_all '$PWD'"
+    [ "$status" -eq 0 ]
+    kv="$HOME/.config/Kvantum"
+    [ "$(cat "$kv/kvantum.kvconfig")" = "$(printf '[General]\ntheme=catppuccin-mocha-nusku')" ]
+    [ -s "$kv/catppuccin-mocha-nusku/catppuccin-mocha-nusku.kvconfig" ]
+    grep -qi 'cba6f7' "$kv/catppuccin-mocha-nusku/catppuccin-mocha-nusku.svg"
+    run grep -qi '89b4fa' "$kv/catppuccin-mocha-nusku/catppuccin-mocha-nusku.svg"
+    [ "$status" -ne 0 ]
+    grep -qi 'highlight.color=#cba6f7' "$kv/catppuccin-mocha-nusku/catppuccin-mocha-nusku.kvconfig"
+    grep -q 'XCURSOR_THEME,catppuccin-mocha-mauve-cursors' "$XDG_CONFIG_HOME/nusku/theme/hypr-cursor.conf"
+    grep -q 'HYPRCURSOR_THEME,catppuccin-mocha-mauve-cursors' "$XDG_CONFIG_HOME/nusku/theme/hypr-cursor.conf"
+    grep -q 'gtk-cursor-theme-name=catppuccin-mocha-mauve-cursors' "$HOME/.config/gtk-3.0/settings.ini"
+    grep -q 'gtk-theme-name=adw-gtk3-dark' "$HOME/.config/gtk-4.0/settings.ini"
 }

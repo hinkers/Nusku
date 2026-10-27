@@ -9,6 +9,7 @@ config/btop .config/btop
 config/fastfetch .config/fastfetch
 config/starship.toml .config/starship.toml
 config/zsh/zshrc .zshrc
+config/zsh/zprofile .zprofile
 config/gtk-3.0/gtk.css .config/gtk-3.0/gtk.css
 config/gtk-4.0/gtk.css .config/gtk-4.0/gtk.css
 config/qt6ct .config/qt6ct
