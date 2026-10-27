@@ -1,0 +1,170 @@
+#!/usr/bin/env bash
+# nusku-wallpaper set FILE [MONITOR|all] | restore | list
+# State: ~/.local/state/nusku/wallpapers (lines MONITOR=/abs/path, *=/abs/path for all monitors).
+set -euo pipefail
+
+self="$(readlink -f "${BASH_SOURCE[0]}")"
+root="$(cd "$(dirname "$self")/.." && pwd)"
+
+state_dir="${XDG_STATE_HOME:-$HOME/.local/state}/nusku"
+state_file="$state_dir/wallpapers"
+current_link="$state_dir/current-wallpaper"
+sddm_dir="${NUSKU_SDDM_BG_DIR:-/var/lib/nusku/sddm-background}"
+default_wallpaper="$root/wallpapers/space.png"
+
+die() {
+    printf 'nusku-wallpaper: %s\n' "$*" >&2
+    exit 1
+}
+
+warn() {
+    printf 'nusku-wallpaper: warning: %s\n' "$*" >&2
+}
+
+_have_hyprland() {
+    command -v hyprctl >/dev/null 2>&1 && [ -n "${HYPRLAND_INSTANCE_SIGNATURE:-}" ]
+}
+
+# Wait up to ~5 s for the hyprpaper IPC socket to answer (login race).
+_wait_ready() {
+    local i
+    for ((i = 0; i < 50; i++)); do
+        if hyprctl hyprpaper listactive >/dev/null 2>&1; then
+            return 0
+        fi
+        sleep 0.1
+    done
+    return 1
+}
+
+# _apply MONITOR FILE: the only place that talks to hyprpaper (0.8: wallpaper MON,PATH,FIT).
+_apply() {
+    _have_hyprland || return 0
+    if ! _wait_ready; then
+        warn "hyprpaper did not answer; wallpaper not applied"
+        return 0
+    fi
+    hyprctl hyprpaper wallpaper "$1,$2,cover" >/dev/null 2>&1 || warn "hyprpaper rejected $2 for '$1'"
+}
+
+_monitors() {
+    _have_hyprland || return 0
+    hyprctl monitors -j 2>/dev/null | jq -r '.[].name' 2>/dev/null || true
+}
+
+# _state_get KEY: print the path saved for KEY, if any.
+_state_get() {
+    [ -r "$state_file" ] || return 0
+    local line
+    while IFS= read -r line; do
+        if [ "${line%%=*}" = "$1" ]; then
+            printf '%s\n' "${line#*=}"
+            return 0
+        fi
+    done <"$state_file"
+}
+
+_update_link() {
+    local img first
+    img="$(_state_get '*')"
+    if [ -z "$img" ] && [ -r "$state_file" ]; then
+        first="$(head -n1 "$state_file")"
+        img="${first#*=}"
+    fi
+    [ -n "$img" ] && ln -sfn "$img" "$current_link"
+    return 0
+}
+
+_sddm_copy() {
+    local file="$1" ext
+    ext="${file##*.}"
+    if [ -d "$sddm_dir" ] && [ -w "$sddm_dir" ]; then
+        rm -f "$sddm_dir"/background.* 2>/dev/null || true
+        if cp -f "$file" "$sddm_dir/background.$ext" 2>/dev/null &&
+            ln -sfn "background.$ext" "$sddm_dir/background"; then
+            return 0
+        fi
+    fi
+    warn "cannot write SDDM background to $sddm_dir; skipping"
+}
+
+cmd_set() {
+    local file="${1:-}" target="${2:-all}" key line tmp
+    [ -n "$file" ] || die "usage: nusku-wallpaper set FILE [MONITOR|all]"
+    [ -f "$file" ] || die "file not found: $file"
+    file="$(readlink -f "$file")"
+    mkdir -p "$state_dir"
+
+    key="$target"
+    [ "$target" = "all" ] && key='*'
+
+    tmp="$(mktemp "$state_dir/.wallpapers.XXXXXX")"
+    if [ "$key" != '*' ] && [ -r "$state_file" ]; then
+        while IFS= read -r line; do
+            [ "${line%%=*}" = "$key" ] || printf '%s\n' "$line"
+        done <"$state_file" >"$tmp"
+    fi
+    if [ "$key" = '*' ]; then
+        printf '*=%s\n' "$file" >"$tmp"
+    else
+        printf '%s=%s\n' "$key" "$file" >>"$tmp"
+    fi
+    mv -f "$tmp" "$state_file"
+    _update_link
+
+    if [ "$key" = '*' ]; then
+        _sddm_copy "$file"
+        local mons m
+        mons="$(_monitors)"
+        if [ -z "$mons" ]; then
+            _apply "" "$file"
+        else
+            while IFS= read -r m; do
+                _apply "$m" "$file"
+            done <<<"$mons"
+        fi
+    else
+        _apply "$key" "$file"
+    fi
+}
+
+cmd_restore() {
+    if [ ! -s "$state_file" ]; then
+        cmd_set "$default_wallpaper" all
+        return 0
+    fi
+    local line k v wild mons m
+    wild="$(_state_get '*')"
+    while IFS= read -r line; do
+        k="${line%%=*}"
+        v="${line#*=}"
+        [ "$k" = '*' ] && continue
+        [ -f "$v" ] && _apply "$k" "$v"
+    done <"$state_file"
+    if [ -n "$wild" ] && [ -f "$wild" ]; then
+        mons="$(_monitors)"
+        if [ -z "$mons" ]; then
+            _apply "" "$wild"
+        else
+            while IFS= read -r m; do
+                [ -n "$(_state_get "$m")" ] || _apply "$m" "$wild"
+            done <<<"$mons"
+        fi
+    fi
+    _update_link
+}
+
+cmd_list() {
+    local f
+    for f in "$root"/wallpapers/*.{png,jpg,jpeg,webp}; do
+        [ -f "$f" ] && printf '%s\n' "$f"
+    done
+    return 0
+}
+
+case "${1:-}" in
+    set) shift; cmd_set "$@" ;;
+    restore) cmd_restore ;;
+    list) cmd_list ;;
+    *) printf 'Usage: nusku-wallpaper set FILE [MONITOR|all] | restore | list\n' >&2; exit 2 ;;
+esac
