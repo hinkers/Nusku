@@ -12,6 +12,7 @@
     5. Reboot, wait for SDDM autologin to start Hyprland and Waybar.
     6. Check services and processes, print a PASS/WARN/FAIL table.
     7. Screenshot the desktop and the rofi launcher with grim.
+    On error the VM is left running for debugging.
     Results go to test/screenshots/<timestamp>/ (gitignored).
     Exit code is 1 if the install or any check failed, else 0.
 
@@ -49,22 +50,32 @@ $SshOpts = @(
     '-o', 'StrictHostKeyChecking=no',
     '-o', 'UserKnownHostsFile=NUL',
     '-o', 'ConnectTimeout=5',
+    '-o', 'ServerAliveInterval=5',
+    '-o', 'ServerAliveCountMax=3',
     '-o', 'BatchMode=yes',
     '-o', 'LogLevel=ERROR'
 )
 
 function Write-Step([string]$Message) { Write-Host "==> $Message" -ForegroundColor Cyan }
 
+# Note: on error the VM is deliberately left as-is (usually running) so you can debug it.
 function Stop-WithError([string]$Message) {
     Write-Host "ERROR: $Message" -ForegroundColor Red
     exit 2
 }
 
-# Runs a bash script on the guest over stdin (avoids quoting problems).
-# Returns stdout lines; the remote exit code is left in $script:RemoteExit.
-function Invoke-Remote([string]$Script) {
+# Builds the ssh command string for a script: base64 has no quoting hazards
+# and avoids the CRLF that PowerShell 5.1 appends when piping to a native exe.
+function ConvertTo-RemoteCommand([string]$Script) {
     $body = ($Script -replace "`r", '') + "`n"
-    $out = $body | & ssh.exe @SshOpts "$User@$($script:Ip)" 'bash -s'
+    $b64 = [Convert]::ToBase64String([System.Text.Encoding]::UTF8.GetBytes($body))
+    return "echo $b64 | base64 -d | bash"
+}
+
+# Runs a bash script on the guest. Returns stdout lines; the remote exit code
+# is left in $script:RemoteExit.
+function Invoke-Remote([string]$Script) {
+    $out = & ssh.exe -n @SshOpts "$User@$($script:Ip)" (ConvertTo-RemoteCommand $Script)
     $script:RemoteExit = $LASTEXITCODE
     return $out
 }
@@ -82,31 +93,49 @@ function Get-GuestIPv4 {
     return $addr
 }
 
-function Wait-ForSsh([int]$TimeoutSec = 180) {
+# Waits for an IPv4 and an open port 22. With -NotBootId, additionally waits
+# until the guest reports a boot_id different from that value (i.e. it has
+# really rebooted, not just still shutting down).
+function Wait-ForSsh([int]$TimeoutSec = 180, [string]$NotBootId = '') {
     $deadline = (Get-Date).AddSeconds($TimeoutSec)
     $script:Ip = $null
+    $sawIp = $false
+    $sawPort = $false
     while ((Get-Date) -lt $deadline) {
         if (-not $script:Ip) { $script:Ip = Get-GuestIPv4 }
         if ($script:Ip) {
+            $sawIp = $true
             $client = New-Object System.Net.Sockets.TcpClient
+            $open = $false
             try {
                 $task = $client.ConnectAsync($script:Ip, 22)
-                if ($task.Wait(2000) -and $client.Connected) { return }
+                $open = ($task.Wait(2000) -and $client.Connected)
             } catch { } finally { $client.Close() }
-            # The address may have changed after a reboot; re-read it next loop.
-            $script:Ip = $null
+            if ($open) {
+                $sawPort = $true
+                if (-not $NotBootId) { return }
+                $id = (Invoke-Remote 'cat /proc/sys/kernel/random/boot_id') | Select-Object -First 1
+                if ($script:RemoteExit -eq 0 -and $id -and $id -ne $NotBootId) { return }
+            } else {
+                # The address may have changed after a reboot; re-read it next loop.
+                $script:Ip = $null
+            }
         }
         Start-Sleep -Seconds 3
     }
-    if (-not $script:Ip) {
+    if (-not $sawIp) {
         Stop-WithError ("No IPv4 address for VM '$Name' after ${TimeoutSec}s. " +
             "Is hv_kvp_daemon running in the guest (systemctl enable --now hv_kvp_daemon, package 'hyperv')?")
     }
-    Stop-WithError "Port 22 on $($script:Ip) did not open within ${TimeoutSec}s. Is sshd enabled in the guest?"
+    if (-not $sawPort) {
+        Stop-WithError ("VM '$Name' has an IP but port 22 never opened within ${TimeoutSec}s. " +
+            "Is sshd running and enabled in the guest (systemctl enable --now sshd), and not firewalled?")
+    }
+    Stop-WithError "VM '$Name' did not come back from the reboot (boot_id unchanged) within ${TimeoutSec}s."
 }
 
 function Assert-SshAuth {
-    $null = & ssh.exe @SshOpts "$User@$($script:Ip)" 'true'
+    $null = & ssh.exe -n @SshOpts "$User@$($script:Ip)" 'true'
     if ($LASTEXITCODE -ne 0) {
         Stop-WithError ("SSH login as '$User' failed. Is the public key '$KeyPath.pub' in " +
             "~$User/.ssh/authorized_keys in the guest (and was the checkpoint taken after adding it)?")
@@ -136,7 +165,7 @@ $installFailed = $false
 
 # ------------------------------------------------------------ 1. restore VM
 Write-Step "Restoring checkpoint '$Checkpoint' on '$Name'"
-if ((Get-VM -Name $Name).State -ne 'Off') { Stop-VM -Name $Name -TurnOff -Force }
+if ((Get-VM -Name $Name).State -in 'Running', 'Paused') { Stop-VM -Name $Name -TurnOff -Force }
 Restore-VMCheckpoint -VMName $Name -Name $Checkpoint -Confirm:$false
 Start-VM -Name $Name
 
@@ -156,9 +185,18 @@ $tarball  = Join-Path $tmp 'nusku.tar'
 
 Push-Location $RepoRoot
 try {
-    # cmd keeps the NUL separators intact (PowerShell pipelines would mangle them).
-    & cmd.exe /c "git ls-files -co --exclude-standard -z > `"$rawList`""
-    if ($LASTEXITCODE -ne 0) { Stop-WithError 'git ls-files failed.' }
+    # Capture raw bytes (NUL separators) without any shell or pipeline in between.
+    $psi = New-Object System.Diagnostics.ProcessStartInfo
+    $psi.FileName = 'git.exe'
+    $psi.Arguments = 'ls-files -co --exclude-standard -z'
+    $psi.WorkingDirectory = $RepoRoot
+    $psi.UseShellExecute = $false
+    $psi.RedirectStandardOutput = $true
+    $proc = [System.Diagnostics.Process]::Start($psi)
+    $fs = [System.IO.File]::Create($rawList)
+    try { $proc.StandardOutput.BaseStream.CopyTo($fs) } finally { $fs.Close() }
+    $proc.WaitForExit()
+    if ($proc.ExitCode -ne 0) { Stop-WithError 'git ls-files failed.' }
 
     $text  = [System.Text.Encoding]::UTF8.GetString([System.IO.File]::ReadAllBytes($rawList))
     $files = $text.Split([char]0, [System.StringSplitOptions]::RemoveEmptyEntries) |
@@ -191,7 +229,7 @@ Remove-Item -Recurse -Force $tmp -ErrorAction SilentlyContinue
 
 # --------------------------------------------------------------- 4. install
 Write-Step 'Running install.sh (this takes a while)'
-& ssh.exe @SshOpts -o ServerAliveInterval=30 "$User@$($script:Ip)" `
+& ssh.exe -n @SshOpts "$User@$($script:Ip)" `
     'cd ~/nusku && NUSKU_NONINTERACTIVE=1 ./install.sh --answers test/answers/vm.answers --no-reboot'
 $installExit = $LASTEXITCODE
 if ($installExit -ne 0) { $installFailed = $true }
@@ -208,9 +246,11 @@ if ($remoteLog) {
 
 # --------------------------------------------------------------- 5. reboot
 Write-Step 'Rebooting and waiting for autologin'
+$bootId = (Invoke-Remote 'cat /proc/sys/kernel/random/boot_id') | Select-Object -First 1
+if (-not $bootId) { Stop-WithError 'Could not read boot_id from the guest before rebooting.' }
 $null = Invoke-Remote 'sudo systemctl reboot'   # ssh may drop with 255; ignore
-Start-Sleep -Seconds 15                           # let it actually go down
-Wait-ForSsh 180
+Start-Sleep -Seconds 5
+Wait-ForSsh 180 $bootId
 
 # Hyprland may show up as "Hyprland" or a wrapper name; match both.
 $hyprUp = $false
@@ -223,12 +263,14 @@ while ((Get-Date) -lt $deadline) {
 if (-not $hyprUp) { Write-Host '    Hyprland did not start within 120 s' -ForegroundColor Yellow }
 
 # Give waybar up to 30 s more.
+$waybarUp = $false
 $deadline = (Get-Date).AddSeconds(30)
 while ($hyprUp -and (Get-Date) -lt $deadline) {
     $null = Invoke-Remote 'pgrep -x waybar >/dev/null'
-    if ($script:RemoteExit -eq 0) { break }
+    if ($script:RemoteExit -eq 0) { $waybarUp = $true; break }
     Start-Sleep -Seconds 2
 }
+if ($hyprUp -and -not $waybarUp) { Write-Host '    waybar did not start within 30 s after Hyprland' -ForegroundColor Yellow }
 Start-Sleep -Seconds 3   # let hyprpaper draw the wallpaper
 
 # --------------------------------------------------------------- 6. checks
@@ -274,19 +316,23 @@ export HYPRLAND_INSTANCE_SIGNATURE="$sig"
 '@
 
 function Save-Screenshot([string]$File) {
-    $null = Invoke-Remote ($envPreamble + "grim /tmp/shot.png")
+    $null = Invoke-Remote ($envPreamble + "`ngrim /tmp/shot.png")
     if ($script:RemoteExit -ne 0) {
         Write-Host "    grim failed for $File (is Hyprland rendering?)" -ForegroundColor Yellow
+        $script:shotFailed = $true
         return
     }
     if (Copy-FromGuest '/tmp/shot.png' (Join-Path $OutDir $File)) {
         Write-Host "    saved $(Join-Path $OutDir $File)"
+    } else {
+        $script:shotFailed = $true
     }
 }
+$script:shotFailed = $false
 
 Write-Step 'Taking screenshots'
 Save-Screenshot 'desktop.png'
-$null = Invoke-Remote ($envPreamble + "hyprctl dispatch exec 'rofi -show drun'")
+$null = Invoke-Remote ($envPreamble + "`nhyprctl dispatch exec 'rofi -show drun'")
 Start-Sleep -Seconds 2
 Save-Screenshot 'rofi.png'
 $null = Invoke-Remote 'pkill rofi || true'
@@ -294,13 +340,14 @@ $null = Invoke-Remote 'pkill rofi || true'
 # ---------------------------------------------------------------- finish
 if (-not $KeepRunning) {
     Write-Step 'Shutting the VM down'
-    Stop-VM -Name $Name -Force
+    Stop-VM -Name $Name -TurnOff -Force
 }
 
 Write-Host ''
 if ($installFailed) { Write-Host "Install FAILED (exit $installExit). See $(Join-Path $OutDir 'install.log')" -ForegroundColor Red }
+if ($shotFailed)    { Write-Host 'A screenshot is missing.' -ForegroundColor Red }
 if ($checksFailed)  { Write-Host 'One or more checks FAILED.' -ForegroundColor Red }
 Write-Host "Results: $OutDir"
-if ($installFailed -or $checksFailed) { exit 1 }
+if ($installFailed -or $checksFailed -or $shotFailed) { exit 1 }
 Write-Host 'All good.' -ForegroundColor Green
 exit 0
