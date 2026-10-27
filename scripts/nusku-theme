@@ -9,6 +9,8 @@ root="$(cd "$(dirname "$self")/.." && pwd)"
 source "$root/lib/log.sh"
 # shellcheck source=lib/answers.sh
 source "$root/lib/answers.sh"
+# shellcheck source=lib/backup.sh
+source "$root/lib/backup.sh"
 # shellcheck source=lib/theme.sh
 source "$root/lib/theme.sh"
 

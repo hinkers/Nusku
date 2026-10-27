@@ -9,7 +9,7 @@ setup() {
 }
 
 in_sub() {
-    bash -c 'source lib/log.sh; source lib/answers.sh; source lib/theme.sh; '"$1"
+    bash -c 'source lib/log.sh; source lib/answers.sh; source lib/backup.sh; source lib/theme.sh; '"$1"
 }
 
 @test "palette has 26 colours" {
@@ -110,4 +110,41 @@ make_repo() {
     [ "$status" -eq 0 ]
     grep -q '^ACCENT=sky$' "$XDG_CONFIG_HOME/nusku/answers"
     grep -q '74c7ec' "$XDG_CONFIG_HOME/nusku/theme/colors.css"
+}
+
+@test "pre-existing user file is backed up once, not on re-render" {
+    make_repo
+    mkdir -p "$HOME/.config/app"
+    printf 'mine\n' >"$HOME/.config/app/c.css"
+    run in_sub "answers_set ACCENT red; theme_render_all '$R'"
+    [ "$status" -eq 0 ]
+    [ "$(cat "$HOME/.config/app/c.css")" = "accent=f38ba8" ]
+    b="$(find "$XDG_STATE_HOME/nusku" -path '*backup-*/.config/app/c.css')"
+    [ -n "$b" ]
+    [ "$(cat "$b")" = "mine" ]
+    rm -rf "$XDG_STATE_HOME"/nusku/backup-*
+    run in_sub "answers_set ACCENT blue; theme_render_all '$R'"
+    [ "$status" -eq 0 ]
+    [ "$(cat "$HOME/.config/app/c.css")" = "accent=89b4fa" ]
+    [ -z "$(find "$XDG_STATE_HOME/nusku" -path '*backup-*' -type f)" ]
+}
+
+@test "render_all dies when a parent directory is a symlink" {
+    make_repo
+    mkdir -p "$BATS_TEST_TMPDIR/elsewhere" "$HOME/.config"
+    ln -s "$BATS_TEST_TMPDIR/elsewhere" "$HOME/.config/app"
+    run in_sub "answers_set ACCENT red; theme_render_all '$R'"
+    [ "$status" -ne 0 ]
+    [ -z "$(ls -A "$BATS_TEST_TMPDIR/elsewhere")" ]
+}
+
+@test "pre-pass failure leaves earlier targets untouched" {
+    make_repo
+    printf 'accent={{accent}}\n' >"$R/theme/templates/home/.a-first.tmpl"
+    mkdir -p "$HOME/.config/app/c.css"
+    printf 'keep\n' >"$HOME/.a-first"
+    run in_sub "answers_set ACCENT red; theme_render_all '$R'"
+    [ "$status" -ne 0 ]
+    [ "$(cat "$HOME/.a-first")" = "keep" ]
+    [ ! -e "$XDG_CONFIG_HOME/nusku/theme/top.conf" ]
 }
