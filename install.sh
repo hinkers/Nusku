@@ -269,7 +269,15 @@ EOF
         gpu_hypr_conf "$(answers_get GPU)" "$(gpu_virt)" >"$NUSKU_CONFIG_DIR/gpu.conf"
     fi
     sddm_prepare_background_dir
-    if [ ! -s "$NUSKU_STATE_DIR/wallpapers" ]; then
+    local wp_state="$NUSKU_STATE_DIR/wallpapers" saved=""
+    if [ -s "$wp_state" ]; then
+        saved="$(sed -n 's/^\*=//p' "$wp_state" | head -n1)"
+    fi
+    if [ ! -s "$wp_state" ]; then
+        run "$HOME/.local/bin/nusku-wallpaper" set "$REPO_ROOT/wallpapers/space.png" all
+    elif [ -n "$saved" ] && [ ! -f "$saved" ]; then
+        # Saved paths are absolute: moving the repo leaves them dangling.
+        log_warn "Saved wallpaper $saved no longer exists; using the default"
         run "$HOME/.local/bin/nusku-wallpaper" set "$REPO_ROOT/wallpapers/space.png" all
     else
         log_info "Wallpaper already chosen; keeping it"

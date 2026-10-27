@@ -95,3 +95,38 @@ STUB
     [ "$status" -eq 0 ]
     [[ "$output" == *"/wallpapers/space.png"* ]]
 }
+
+@test "restore with a missing saved * file falls back to the default and rewrites state" {
+    mkdir -p "$STATE"
+    printf '*=%s\nDP-1=%s\n' "$BATS_TEST_TMPDIR/gone/old.png" "$BATS_TEST_TMPDIR/two.jpg" >"$STATE/wallpapers"
+    ln -sfn "$BATS_TEST_TMPDIR/gone/old.png" "$STATE/current-wallpaper"
+    run scripts/nusku-wallpaper restore
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"warning"*"old.png"* ]]
+    grep -q '^\*=.*/wallpapers/space.png$' "$STATE/wallpapers"
+    grep -qx "DP-1=$BATS_TEST_TMPDIR/two.jpg" "$STATE/wallpapers"
+    [ "$(grep -c 'old.png' "$STATE/wallpapers")" -eq 0 ]
+    [ -f "$(readlink "$STATE/current-wallpaper")" ]
+    grep -q "hyprpaper wallpaper HDMI-A-1,.*/wallpapers/space.png,cover" "$HCLOG"
+    grep -q "hyprpaper wallpaper DP-1,$BATS_TEST_TMPDIR/two.jpg,cover" "$HCLOG"
+}
+
+@test "restore drops a missing per-monitor file so the monitor uses the * wallpaper" {
+    mkdir -p "$STATE"
+    printf '*=%s\nDP-1=%s\n' "$BATS_TEST_TMPDIR/one.png" "$BATS_TEST_TMPDIR/gone/old.jpg" >"$STATE/wallpapers"
+    run scripts/nusku-wallpaper restore
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"warning"*"old.jpg"* ]]
+    [ "$(grep -c 'DP-1=' "$STATE/wallpapers")" -eq 0 ]
+    grep -qx "\*=$BATS_TEST_TMPDIR/one.png" "$STATE/wallpapers"
+    grep -q "hyprpaper wallpaper DP-1,$BATS_TEST_TMPDIR/one.png,cover" "$HCLOG"
+}
+
+@test "restore with only missing per-monitor files falls back to the default" {
+    mkdir -p "$STATE"
+    printf 'DP-1=%s\n' "$BATS_TEST_TMPDIR/gone/old.jpg" >"$STATE/wallpapers"
+    run scripts/nusku-wallpaper restore
+    [ "$status" -eq 0 ]
+    grep -qx '\*=.*/wallpapers/space.png' "$STATE/wallpapers"
+    [ "$(wc -l <"$STATE/wallpapers")" -eq 1 ]
+}

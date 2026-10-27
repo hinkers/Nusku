@@ -47,12 +47,19 @@ fi
 after="$(backups)"
 
 echo "=== update run (saved answers) ==="
+# Simulate a moved repo: the saved wallpaper path no longer exists.
+printf "*=/nonexistent/old-repo/wallpapers/space.png\n" >"$state/wallpapers"
 if ./install.sh --update --no-reboot; then
     pass "install.sh --update exited 0"
 else
     bad "install.sh --update exited non-zero"
 fi
 [ "$(backups)" = "$before" ] || bad "--update run created a backup dir"
+if grep -qx "\*=/nusku/wallpapers/space.png" "$state/wallpapers" && [ -f "$(readlink "$state/current-wallpaper")" ]; then
+    pass "--update replaced a dangling saved wallpaper with the default"
+else
+    bad "--update kept a dangling wallpaper: $(cat "$state/wallpapers")"
+fi
 
 echo "=== assertions ==="
 if [ -L "$HOME/.config/hypr" ]; then

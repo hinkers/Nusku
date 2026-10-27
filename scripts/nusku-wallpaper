@@ -128,7 +128,38 @@ cmd_set() {
     fi
 }
 
+# _prune_missing: drop saved entries whose file is gone (e.g. the repo was moved);
+# a missing * entry becomes the default wallpaper. Rewrites state only if something changed.
+_prune_missing() {
+    local line k v tmp changed=0
+    tmp="$(mktemp "$state_dir/.wallpapers.XXXXXX")"
+    while IFS= read -r line; do
+        [ -n "$line" ] || continue
+        k="${line%%=*}"
+        v="${line#*=}"
+        if [ -f "$v" ]; then
+            printf '%s
+' "$line"
+            continue
+        fi
+        changed=1
+        if [ "$k" = '*' ]; then
+            warn "saved wallpaper $v is missing; using the default"
+            printf '*=%s
+' "$default_wallpaper"
+        else
+            warn "saved wallpaper $v for $k is missing; dropping it"
+        fi
+    done <"$state_file" >"$tmp"
+    if [ "$changed" -eq 1 ]; then
+        mv -f "$tmp" "$state_file"
+    else
+        rm -f "$tmp"
+    fi
+}
+
 cmd_restore() {
+    [ ! -s "$state_file" ] || _prune_missing
     if [ ! -s "$state_file" ]; then
         cmd_set "$default_wallpaper" all
         return 0
