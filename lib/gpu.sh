@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # GPU driver selection and configuration. Sourced, not executed.
-# Needs lib/log.sh, lib/answers.sh, lib/packages.sh and lib/grub.sh.
+# Needs lib/log.sh, lib/answers.sh, lib/packages.sh, lib/grub.sh and lib/backup.sh.
 
 NUSKU_ROOT="${NUSKU_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
 
@@ -114,7 +114,12 @@ _gpu_edit_etc() {
     cp "$file" "$tmp"
     "$func" "$tmp" "$@" || rc=$?
     if [ "$rc" -eq 0 ]; then
-        run sudo install -m 644 "$tmp" "$file"
+        backup_file "$file"
+        # Subshell: run's die exits, and the temp file must still be removed.
+        if ! (run sudo install -m 644 "$tmp" "$file"); then
+            rm -f "$tmp"
+            exit 1
+        fi
     fi
     rm -f "$tmp"
     return "$rc"

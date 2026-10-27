@@ -16,7 +16,7 @@ setup() {
 }
 
 in_sub() {
-    PATH="$STUBS:$PATH" CALLS="$CALLS" bash -c 'source lib/log.sh; source lib/answers.sh; source lib/packages.sh; source lib/grub.sh; source lib/gpu.sh; '"$1"
+    PATH="$STUBS:$PATH" CALLS="$CALLS" bash -c 'source lib/log.sh; source lib/answers.sh; source lib/packages.sh; source lib/grub.sh; source lib/backup.sh; source lib/gpu.sh; '"$1"
 }
 
 @test "gpu_package_lists hybrid-intel open = intel + nvidia-open + prime" {
@@ -47,7 +47,7 @@ in_sub() {
 
 @test "gpu_package_lists nvidia proprietary includes the AUR legacy list, no repo nvidia-utils, no prime" {
     run in_sub 'pkg_read_list $(gpu_package_lists nvidia proprietary none)'
-    ! grep -qx nvidia-utils <<<"$output"
+    [ -z "$(grep -x nvidia-utils <<<"$output")" ]
     [[ "$output" == *nvidia-580xx-dkms* ]]
     [[ "$output" != *nvidia-open-dkms* ]]
     [[ "$output" != *nvidia-prime* ]]
@@ -112,12 +112,14 @@ in_sub() {
     grep -q 'pacman -S --needed --noconfirm nvidia-open-dkms' "$CALLS"
     [ "$(grep -c '^mkinitcpio -P' "$CALLS")" -eq 1 ]
     [ "$(grep -c '^grub-mkconfig -o /boot/grub/grub.cfg' "$CALLS")" -eq 1 ]
+    [ -n "$(find "$BATS_TEST_TMPDIR"/nusku/backup-* -name grub -type f)" ]
+    [ -n "$(find "$BATS_TEST_TMPDIR"/nusku/backup-* -name mk -type f)" ]
     grep -q NVD_BACKEND "$BATS_TEST_TMPDIR/cfg/nusku/gpu.conf"
     : >"$CALLS"
     run in_sub "answers_set GPU nvidia; answers_set NVIDIA_MODULE open; gpu_configure"
     [ "$status" -eq 0 ]
-    ! grep -q '^mkinitcpio' "$CALLS"
-    ! grep -q '^grub-mkconfig' "$CALLS"
+    [ "$(grep -c '^mkinitcpio' "$CALLS")" -eq 0 ]
+    [ "$(grep -c '^grub-mkconfig' "$CALLS")" -eq 0 ]
 }
 
 @test "gpu_configure nvidia with missing grub file warns, does not die" {
@@ -126,13 +128,13 @@ in_sub() {
     run in_sub "answers_set GPU nvidia; answers_set NVIDIA_MODULE open; gpu_configure"
     [ "$status" -eq 0 ]
     [[ "$output" == *nvidia_drm.modeset=1* ]]
-    ! grep -q '^grub-mkconfig' "$CALLS"
+    [ "$(grep -c '^grub-mkconfig' "$CALLS")" -eq 0 ]
 }
 
 @test "gpu_configure amd does no boot edits" {
     run in_sub "answers_set GPU amd; gpu_configure"
     [ "$status" -eq 0 ]
-    ! grep -q '^mkinitcpio' "$CALLS"
+    [ "$(grep -c '^mkinitcpio' "$CALLS")" -eq 0 ]
     [ -f "$BATS_TEST_TMPDIR/cfg/nusku/gpu.conf" ]
 }
 
@@ -150,7 +152,7 @@ in_sub() {
     run in_sub "answers_set GPU nvidia; answers_set NVIDIA_MODULE proprietary; answers_set AUR_HELPER paru; gpu_configure"
     [ "$status" -eq 0 ]
     grep -q '^pacman -S --needed --noconfirm egl-wayland' "$CALLS"
-    ! grep -q 'nvidia-utils' "$CALLS" || grep -q 'nvidia-580xx-utils' "$CALLS"
+    [ "$(grep -cw 'nvidia-utils' "$CALLS")" -eq 0 ]
     grep -q '^paru -S --needed --noconfirm nvidia-580xx-dkms nvidia-580xx-utils' "$CALLS"
     [ "$(grep -n '^pacman' "$CALLS" | head -1 | cut -d: -f1)" -lt "$(grep -n '^paru' "$CALLS" | head -1 | cut -d: -f1)" ]
 }
