@@ -1,7 +1,7 @@
 # Nusku — Arch + Hyprland Desktop Bootstrap: Design
 
 Date: 2026-10-27
-Status: draft for owner review
+Status: approved
 
 ## 1. Intent
 
