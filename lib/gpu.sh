@@ -76,6 +76,23 @@ gpu_package_lists() {
     esac
 }
 
+# gpu_kernel_headers GPU: <kernel>-headers for each installed kernel (DKMS needs them),
+# only for NVIDIA choices; prints nothing otherwise.
+gpu_kernel_headers() {
+    local k
+    case "${1:-}" in
+        nvidia | hybrid-*) ;;
+        *) return 0 ;;
+    esac
+    for k in linux linux-lts linux-zen linux-hardened; do
+        if pacman -Qq "$k" >/dev/null 2>&1; then
+            printf '%s-headers
+' "$k"
+        fi
+    done
+    return 0
+}
+
 # gpu_hypr_conf GPU VIRT: contents of ~/.config/nusku/gpu.conf.
 gpu_hypr_conf() {
     local gpu="${1:-}" virt="${2:-none}"
@@ -145,6 +162,7 @@ gpu_configure() {
     if [ "${#repo_lists[@]}" -gt 0 ]; then
         while IFS= read -r n; do repo_names+=("$n"); done < <(pkg_read_list "${repo_lists[@]}")
     fi
+    while IFS= read -r n; do repo_names+=("$n"); done < <(gpu_kernel_headers "$gpu")
     if [ "${#aur_lists[@]}" -gt 0 ]; then
         while IFS= read -r n; do aur_names+=("$n"); done < <(pkg_read_list "${aur_lists[@]}")
     fi

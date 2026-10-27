@@ -156,3 +156,54 @@ in_sub() {
     grep -q '^paru -S --needed --noconfirm nvidia-580xx-dkms nvidia-580xx-utils' "$CALLS"
     [ "$(grep -n '^pacman' "$CALLS" | head -1 | cut -d: -f1)" -lt "$(grep -n '^paru' "$CALLS" | head -1 | cut -d: -f1)" ]
 }
+
+# pacman stub that also answers -Qq for the kernels listed in STUB_KERNELS.
+_kernel_pacman() {
+    cat >"$STUBS/pacman" <<'STUB'
+#!/usr/bin/env bash
+echo "pacman $*" >>"$CALLS"
+if [ "$1" = "-Qq" ]; then
+    shift
+    rc=0
+    for p in "$@"; do
+        case " $STUB_KERNELS " in
+            *" $p "*) echo "$p" ;;
+            *) echo "error: package '$p' was not found" >&2; rc=1 ;;
+        esac
+    done
+    exit "$rc"
+fi
+STUB
+    chmod +x "$STUBS/pacman"
+}
+
+@test "nvidia package lists no longer hard-code linux-headers" {
+    run in_sub 'pkg_read_list packages/gpu-nvidia-open.pacman packages/gpu-nvidia.pacman'
+    [ "$status" -eq 0 ]
+    [ -z "$(grep -x linux-headers <<<"$output")" ]
+}
+
+@test "gpu_kernel_headers: headers for each installed kernel, only for NVIDIA" {
+    _kernel_pacman
+    export STUB_KERNELS="linux-zen linux-lts"
+    run in_sub "gpu_kernel_headers nvidia | tr '\n' ' '"
+    [ "$status" -eq 0 ]
+    [ "$output" = "linux-lts-headers linux-zen-headers " ]
+    run in_sub "gpu_kernel_headers hybrid-amd | tr '\n' ' '"
+    [ "$output" = "linux-lts-headers linux-zen-headers " ]
+    run in_sub "gpu_kernel_headers amd"
+    [ "$status" -eq 0 ]
+    [ -z "$output" ]
+}
+
+@test "gpu_configure nvidia installs headers for the installed kernels" {
+    _kernel_pacman
+    export STUB_KERNELS="linux linux-hardened"
+    export NUSKU_GRUB_DEFAULT="$BATS_TEST_TMPDIR/nogrub" NUSKU_MKINITCPIO_CONF="$BATS_TEST_TMPDIR/nomk"
+    run in_sub "answers_set GPU nvidia; answers_set NVIDIA_MODULE open; gpu_configure"
+    [ "$status" -eq 0 ]
+    line="$(grep '^pacman -S ' "$CALLS")"
+    [[ " $line " == *" linux-headers "* ]]
+    [[ " $line " == *" linux-hardened-headers "* ]]
+    [[ " $line " != *" linux-lts-headers "* ]]
+}

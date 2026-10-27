@@ -231,6 +231,8 @@ step_packages() {
     done <<<"$lists"
     text="$(_read_lists "${repo_lists[@]}")"
     [ -z "$text" ] || mapfile -t repo_names <<<"$text"
+    text="$(gpu_kernel_headers "$(answers_get GPU)")"
+    [ -z "$text" ] || mapfile -t -O "${#repo_names[@]}" repo_names <<<"$text"
     text="$(_read_lists "${aur_lists[@]}")"
     [ -z "$text" ] || mapfile -t aur_names <<<"$text"
     pkg_install_repo "${repo_names[@]}"
