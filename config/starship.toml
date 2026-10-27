@@ -1,3 +1,6 @@
+# Generated from: starship preset catppuccin-powerline (starship 1.27.0), palette catppuccin_mocha.
+# Starship is ISC licensed: https://github.com/starship/starship/blob/master/LICENSE
+
 "$schema" = 'https://starship.rs/config-schema.json'
 
 format = """

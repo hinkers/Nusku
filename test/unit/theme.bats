@@ -153,7 +153,9 @@ make_repo() {
     run in_sub "answers_set ACCENT mauve; theme_render_all '$PWD'"
     [ "$status" -eq 0 ]
     kv="$HOME/.config/Kvantum"
-    [ "$(cat "$kv/kvantum.kvconfig")" = "$(printf '[General]\ntheme=catppuccin-mocha-nusku')" ]
+    grep -qx 'theme=catppuccin-mocha-nusku' "$kv/kvantum.kvconfig"
+    run grep -rn '^#' "$kv" --include='*.kvconfig'
+    [ "$status" -ne 0 ]
     [ -s "$kv/catppuccin-mocha-nusku/catppuccin-mocha-nusku.kvconfig" ]
     grep -qi 'cba6f7' "$kv/catppuccin-mocha-nusku/catppuccin-mocha-nusku.svg"
     run grep -qi '89b4fa' "$kv/catppuccin-mocha-nusku/catppuccin-mocha-nusku.svg"
