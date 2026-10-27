@@ -171,7 +171,7 @@ step_questions() {
         nvidia | hybrid-*)
             ask_menu NVIDIA_MODULE "Which NVIDIA driver?" open \
                 open "open — RTX 20xx / GTX 16xx and newer (recommended)" \
-                proprietary "proprietary — legacy driver for GTX 10xx and older (AUR)"
+                proprietary "proprietary — legacy driver for GTX 900/10xx (AUR)"
             ;;
     esac
     ask_menu AUR_HELPER "Which AUR helper?" paru \
