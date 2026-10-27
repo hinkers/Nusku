@@ -121,16 +121,21 @@ gpu_hypr_conf() {
     esac
 }
 
-# _gpu_edit_etc FILE FUNC ARGS...: apply a pure edit function to a temp copy, then sudo-install it.
-# Returns 0 if changed, 1 if unchanged, 2 if FILE is missing.
+# _gpu_edit_etc FILE KEY_RE FUNC ARGS...: apply a pure edit function to a temp copy, check the
+# result is non-empty and still has a line matching KEY_RE, then sudo-install it.
+# Returns 0 if changed, 1 if unchanged, 2 if FILE is missing; dies on a broken edit.
 _gpu_edit_etc() {
-    local file="$1" func="$2" tmp rc=0
-    shift 2
+    local file="$1" key="$2" func="$3" tmp rc=0
+    shift 3
     [ -r "$file" ] || return 2
     tmp="$(mktemp)"
     cp "$file" "$tmp"
     "$func" "$tmp" "$@" || rc=$?
     if [ "$rc" -eq 0 ]; then
+        if [ ! -s "$tmp" ] || ! grep -q "$key" "$tmp"; then
+            rm -f "$tmp"
+            die "Editing $file went wrong (result empty or missing $key); left it unchanged"
+        fi
         backup_file "$file"
         # Subshell: run's die exits, and the temp file must still be removed.
         if ! (run sudo install -m 644 "$tmp" "$file"); then
@@ -140,6 +145,20 @@ _gpu_edit_etc() {
     fi
     rm -f "$tmp"
     return "$rc"
+}
+
+# _gpu_mkinit_edit FILE: add the NVIDIA modules and drop the kms hook (keeps nouveau out
+# of the initramfs). 0 if either changed, 1 if nothing did, 2 if FILE is unreadable.
+_gpu_mkinit_edit() {
+    local rc_mod=0 rc_hook=0
+    mkinit_add_modules "$1" "${NUSKU_NVIDIA_MODULES[@]}" || rc_mod=$?
+    [ "$rc_mod" -ne 2 ] || return 2
+    mkinit_remove_hook "$1" kms || rc_hook=$?
+    [ "$rc_hook" -ne 2 ] || return 2
+    if [ "$rc_mod" -eq 0 ] || [ "$rc_hook" -eq 0 ]; then
+        return 0
+    fi
+    return 1
 }
 
 # gpu_configure: install drivers, edit boot config, write gpu.conf, using the answers.
@@ -172,16 +191,16 @@ gpu_configure() {
     case "$gpu" in
         nvidia | hybrid-*)
             rc=0
-            _gpu_edit_etc "${NUSKU_GRUB_DEFAULT:-/etc/default/grub}" grub_add_params "${NUSKU_NVIDIA_PARAMS[@]}" || rc=$?
+            _gpu_edit_etc "${NUSKU_GRUB_DEFAULT:-/etc/default/grub}" '^GRUB_CMDLINE_LINUX_DEFAULT=' grub_add_params "${NUSKU_NVIDIA_PARAMS[@]}" || rc=$?
             case "$rc" in
                 0) run sudo grub-mkconfig -o /boot/grub/grub.cfg ;;
                 2) log_warn "No GRUB config found; add these kernel parameters manually: ${NUSKU_NVIDIA_PARAMS[*]}" ;;
             esac
             rc=0
-            _gpu_edit_etc "${NUSKU_MKINITCPIO_CONF:-/etc/mkinitcpio.conf}" mkinit_add_modules "${NUSKU_NVIDIA_MODULES[@]}" || rc=$?
+            _gpu_edit_etc "${NUSKU_MKINITCPIO_CONF:-/etc/mkinitcpio.conf}" '^MODULES=(' _gpu_mkinit_edit || rc=$?
             case "$rc" in
                 0) run sudo mkinitcpio -P ;;
-                2) log_warn "No mkinitcpio.conf found; add these modules manually: ${NUSKU_NVIDIA_MODULES[*]}" ;;
+                2) log_warn "No mkinitcpio.conf found; add these modules manually: ${NUSKU_NVIDIA_MODULES[*]} (and remove the kms hook)" ;;
             esac
             ;;
     esac

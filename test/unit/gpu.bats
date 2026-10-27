@@ -103,12 +103,13 @@ in_sub() {
 
 @test "gpu_configure nvidia edits files, rebuilds once, writes gpu.conf" {
     printf 'GRUB_CMDLINE_LINUX_DEFAULT="quiet"\n' >"$BATS_TEST_TMPDIR/grub"
-    printf 'MODULES=()\n' >"$BATS_TEST_TMPDIR/mk"
+    printf 'MODULES=()\nHOOKS=(base udev autodetect modconf kms keyboard block filesystems)\n' >"$BATS_TEST_TMPDIR/mk"
     export NUSKU_GRUB_DEFAULT="$BATS_TEST_TMPDIR/grub" NUSKU_MKINITCPIO_CONF="$BATS_TEST_TMPDIR/mk"
     run in_sub "answers_set GPU nvidia; answers_set NVIDIA_MODULE open; gpu_configure"
     [ "$status" -eq 0 ]
     grep -q 'nvidia_drm.modeset=1 nvidia_drm.fbdev=1' "$BATS_TEST_TMPDIR/grub"
     grep -qx 'MODULES=(nvidia nvidia_modeset nvidia_uvm nvidia_drm)' "$BATS_TEST_TMPDIR/mk"
+    grep -qx 'HOOKS=(base udev autodetect modconf keyboard block filesystems)' "$BATS_TEST_TMPDIR/mk"
     grep -q 'pacman -S --needed --noconfirm nvidia-open-dkms' "$CALLS"
     [ "$(grep -c '^mkinitcpio -P' "$CALLS")" -eq 1 ]
     [ "$(grep -c '^grub-mkconfig -o /boot/grub/grub.cfg' "$CALLS")" -eq 1 ]
@@ -206,4 +207,34 @@ STUB
     [[ " $line " == *" linux-headers "* ]]
     [[ " $line " == *" linux-hardened-headers "* ]]
     [[ " $line " != *" linux-lts-headers "* ]]
+}
+
+@test "gpu_configure removes kms when MODULES already has the NVIDIA modules (one rebuild)" {
+    printf 'MODULES=(nvidia nvidia_modeset nvidia_uvm nvidia_drm)\nHOOKS=(base kms block)\n' >"$BATS_TEST_TMPDIR/mk"
+    export NUSKU_GRUB_DEFAULT="$BATS_TEST_TMPDIR/nogrub" NUSKU_MKINITCPIO_CONF="$BATS_TEST_TMPDIR/mk"
+    run in_sub "answers_set GPU hybrid-intel; answers_set NVIDIA_MODULE open; gpu_configure"
+    [ "$status" -eq 0 ]
+    grep -qx 'HOOKS=(base block)' "$BATS_TEST_TMPDIR/mk"
+    [ "$(grep -c '^mkinitcpio -P' "$CALLS")" -eq 1 ]
+}
+
+@test "_gpu_edit_etc dies and installs nothing when the edit empties the file" {
+    f="$BATS_TEST_TMPDIR/conf"
+    printf 'KEY=(a)\n' >"$f"
+    run in_sub 'bad_edit() { : >"$1"; return 0; }; _gpu_edit_etc "'"$f"'" "^KEY=" bad_edit; echo survived'
+    [ "$status" -ne 0 ]
+    [[ "$output" != *survived* ]]
+    grep -qx 'KEY=(a)' "$f"
+    [ "$(grep -c 'install -m 644' "$CALLS")" -eq 0 ]
+}
+
+@test "_gpu_edit_etc dies and installs nothing when the edit drops the key line" {
+    f="$BATS_TEST_TMPDIR/conf"
+    printf 'KEY=(a)\n' >"$f"
+    run in_sub 'drop_key() { echo OTHER=1 >"$1"; return 0; }; _gpu_edit_etc "'"$f"'" "^KEY=" drop_key; echo survived'
+    [ "$status" -ne 0 ]
+    [[ "$output" != *survived* ]]
+    [[ "$output" == *KEY=* ]]
+    grep -qx 'KEY=(a)' "$f"
+    [ "$(grep -c 'install -m 644' "$CALLS")" -eq 0 ]
 }

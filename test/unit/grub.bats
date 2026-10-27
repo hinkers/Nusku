@@ -59,3 +59,35 @@ in_sub() { bash -c 'source lib/log.sh; source lib/answers.sh; source lib/package
     [ "$status" -eq 1 ]
     grep -qx 'MODULES=(btrfs nvidia)' "$f"
 }
+
+@test "mkinit_remove_hook removes kms and keeps the rest" {
+    f="$BATS_TEST_TMPDIR/mk"
+    printf 'MODULES=()\nHOOKS=(base systemd autodetect microcode modconf kms keyboard sd-vconsole block filesystems fsck)\n' >"$f"
+    run in_sub "mkinit_remove_hook '$f' kms"
+    [ "$status" -eq 0 ]
+    grep -qx 'HOOKS=(base systemd autodetect microcode modconf keyboard sd-vconsole block filesystems fsck)' "$f"
+    grep -qx 'MODULES=()' "$f"
+}
+
+@test "mkinit_remove_hook is idempotent (status 1) and 2 for a missing file" {
+    f="$BATS_TEST_TMPDIR/mk"
+    printf 'HOOKS=(base kms udev)\n' >"$f"
+    run in_sub "mkinit_remove_hook '$f' kms"
+    [ "$status" -eq 0 ]
+    run in_sub "mkinit_remove_hook '$f' kms"
+    [ "$status" -eq 1 ]
+    grep -qx 'HOOKS=(base udev)' "$f"
+    printf 'MODULES=()\n' >"$f"
+    run in_sub "mkinit_remove_hook '$f' kms"
+    [ "$status" -eq 1 ]
+    run in_sub "mkinit_remove_hook '$BATS_TEST_TMPDIR/none' kms"
+    [ "$status" -eq 2 ]
+}
+
+@test "mkinit_remove_hook does not touch similarly named hooks" {
+    f="$BATS_TEST_TMPDIR/mk"
+    printf 'HOOKS=(base kmsx xkms)\n' >"$f"
+    run in_sub "mkinit_remove_hook '$f' kms"
+    [ "$status" -eq 1 ]
+    grep -qx 'HOOKS=(base kmsx xkms)' "$f"
+}
