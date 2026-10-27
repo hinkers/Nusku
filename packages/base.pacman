@@ -1,0 +1,69 @@
+# Nusku base packages (official repos). One per line; '#' starts a comment.
+
+# Desktop
+hyprland
+hyprlock
+hypridle
+hyprpaper
+hyprpolkitagent
+xdg-desktop-portal-hyprland
+xdg-desktop-portal-gtk
+qt5-wayland
+qt6-wayland
+sddm
+waybar
+kitty
+rofi
+swaync
+cliphist
+wl-clipboard
+grim
+slurp
+hyprshot
+
+# System
+pipewire
+pipewire-pulse
+pipewire-alsa
+wireplumber
+pavucontrol
+networkmanager
+network-manager-applet
+bluez
+bluez-utils
+blueman
+power-profiles-daemon
+thunar
+thunar-volman
+gvfs
+tumbler
+brightnessctl
+playerctl
+xdg-user-dirs
+
+# Shell
+zsh
+starship
+fzf
+ripgrep
+fd
+bat
+eza
+zoxide
+
+# Tools
+btop
+fastfetch
+imagemagick
+jq
+libnotify
+
+# Theming
+ttf-jetbrains-mono-nerd
+noto-fonts
+noto-fonts-emoji
+adw-gtk-theme
+papirus-icon-theme
+kvantum
+qt6ct
+qt5ct
