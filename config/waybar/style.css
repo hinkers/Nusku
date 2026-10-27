@@ -1,0 +1,122 @@
+/* Nusku waybar style. Palette names come from the rendered colors.css. */
+@import "../nusku/theme/colors.css";
+
+* {
+  font-family: "JetBrainsMono Nerd Font", monospace;
+  font-size: 14px;
+  border: none;
+  border-radius: 0;
+  min-height: 0;
+}
+
+window#waybar {
+  background: alpha(@base, 0.92);
+  color: @text;
+  border-bottom: 2px solid @surface0;
+}
+
+tooltip {
+  background: @mantle;
+  color: @text;
+  border: 1px solid @surface1;
+  border-radius: 8px;
+}
+
+#workspaces {
+  margin: 4px 4px 4px 6px;
+}
+
+#workspaces button {
+  padding: 0 10px;
+  margin: 0 2px;
+  color: @subtext0;
+  background: transparent;
+  border-radius: 8px;
+}
+
+#workspaces button:hover {
+  background: @surface0;
+  color: @text;
+}
+
+#workspaces button.active {
+  background: @accent;
+  color: @base;
+  font-weight: bold;
+}
+
+#workspaces button.urgent {
+  background: @red;
+  color: @base;
+}
+
+#window {
+  margin-left: 8px;
+  color: @subtext1;
+}
+
+#clock,
+#tray,
+#pulseaudio,
+#network,
+#bluetooth,
+#battery,
+#custom-notification {
+  margin: 4px 2px;
+  padding: 0 12px;
+  background: @surface0;
+  color: @text;
+  border-radius: 8px;
+}
+
+#clock {
+  color: @accent;
+  font-weight: bold;
+}
+
+#pulseaudio,
+#network,
+#bluetooth,
+#custom-notification {
+  color: @accent;
+}
+
+#pulseaudio:hover,
+#network:hover,
+#bluetooth:hover,
+#custom-notification:hover {
+  background: @surface1;
+}
+
+#pulseaudio.muted,
+#network.disconnected,
+#bluetooth.off,
+#bluetooth.disabled {
+  color: @overlay1;
+}
+
+#battery {
+  color: @green;
+}
+
+#battery.warning {
+  color: @yellow;
+}
+
+#battery.critical:not(.charging) {
+  color: @red;
+}
+
+#battery.charging,
+#battery.plugged {
+  color: @teal;
+}
+
+#tray > .passive {
+  -gtk-icon-effect: dim;
+}
+
+#tray > .needs-attention {
+  -gtk-icon-effect: highlight;
+  background: @red;
+}
