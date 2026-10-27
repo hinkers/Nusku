@@ -56,11 +56,11 @@ die() {
     exit 1
 }
 
-# run CMD ARGS...: output goes to the log and the terminal; failure calls die.
-# The command runs in a pipeline subshell (functions work, but its variable
-# changes do not persist). Exit status is carried via a temp file so neither
-# pipefail nor errexit state of the caller matters or is altered.
-run() {
+# run_soft CMD ARGS...: like run (output to log and terminal) but returns the
+# command's status and never dies. The command runs in a pipeline subshell.
+# Exit status is carried via a temp file so neither pipefail nor errexit state
+# of the caller matters or is altered.
+run_soft() {
     _log_ensure
     local rcfile rc
     rcfile="$(mktemp)"
@@ -72,7 +72,10 @@ run() {
     } 2>&1 | tee -a "$NUSKU_LOG" || true
     rc="$(cat "$rcfile" 2>/dev/null)"
     rm -f "$rcfile"
-    if [ "${rc:-1}" -ne 0 ]; then
-        die "command failed: $*"
-    fi
+    return "${rc:-1}"
+}
+
+# run CMD ARGS...: run_soft, but failure calls die.
+run() {
+    run_soft "$@" || die "command failed: $*"
 }

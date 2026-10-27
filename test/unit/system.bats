@@ -26,10 +26,13 @@ EOS
     printf '#!/bin/sh\necho "chsh $*" >>"$CALLS"\n' >"$STUBS/chsh"
     printf '#!/bin/sh\necho kvm\n' >"$STUBS/systemd-detect-virt"
     chmod +x "$STUBS"/*
+    HASH_OK="$(printf 'catppuccin-mocha-teal-sddm.zip
+' | sha256sum | cut -d" " -f1)"
+    export HASH_OK
 }
 
 in_sub() {
-    PATH="$STUBS:$PATH" bash -c 'source lib/log.sh; source lib/answers.sh; source lib/backup.sh; source lib/gpu.sh; source lib/system.sh; '"$1"
+    PATH="$STUBS:$PATH" bash -c 'source lib/log.sh; source lib/answers.sh; source lib/backup.sh; source lib/gpu.sh; source lib/system.sh; SDDM_THEME_SHA256[teal]="${HASH_TEAL:-$HASH_OK}"; '"$1"
 }
 
 @test "writes theme conf with accent" {
@@ -116,6 +119,8 @@ in_sub() {
     printf '#!/bin/sh\necho "systemctl $*" >>"$CALLS"\n[ "$1" = --global ] && exit 1\nexit 0\n' >"$STUBS/systemctl"
     run in_sub "answers_set GPU vm; services_enable"
     [ "$status" -eq 0 ]
+    [[ "$output" != *"install failed"* ]]
+    [[ "$output" == *"Could not enable user unit"* ]]
     grep -q 'systemctl enable sddm NetworkManager bluetooth power-profiles-daemon qemu-guest-agent' "$CALLS"
     grep -q 'systemctl --global enable wireplumber' "$CALLS"
 }
@@ -134,4 +139,16 @@ in_sub() {
     run in_sub "gtk_apply_settings mauve"
     grep -q 'cursor-theme catppuccin-mocha-mauve-cursors' "$CALLS"
     grep -q 'color-scheme prefer-dark' "$CALLS"
+}
+
+@test "sddm_install_theme dies on checksum mismatch and installs nothing" {
+    HASH_TEAL=deadbeef run in_sub "sddm_install_theme teal"
+    [ "$status" -ne 0 ]
+    [[ "$output" == *"checksum mismatch"* ]]
+    [ ! -e "$NUSKU_SDDM_THEMES/catppuccin-mocha-teal" ]
+}
+
+@test "every accent has a pinned sha256" {
+    run in_sub 'for a in "${NUSKU_ACCENTS[@]}"; do [[ "${SDDM_THEME_SHA256[$a]:-}" =~ ^[0-9a-f]{64}$ ]] || echo "missing $a"; done'
+    [ -z "$output" ]
 }

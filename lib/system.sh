@@ -5,6 +5,23 @@
 NUSKU_ROOT="${NUSKU_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
 
 SDDM_THEME_VERSION="v1.1.2"
+# SHA-256 of each catppuccin-mocha-<accent>-sddm.zip at that version.
+declare -gA SDDM_THEME_SHA256=(
+    [rosewater]=18eb1a4471a6d8c74ac7182137fb5ab0f5795b99eb2da9036d2aafddd1c4e2ce
+    [flamingo]=da49a4951377cf952ba33a5a3335edcd85631e8e375ef7d648c9cf7e82db65ab
+    [pink]=18f79ce47e519e2fdc09cf69857ed8a020d9177cdb1be9626c802fff3e810b95
+    [mauve]=3d9bcc540924e06ae1aaef6994130170db7f630d7d1b25fe5e780d08493ed67f
+    [red]=4a016ec4e32d4bb1c1bc61ac4a75597a1f745eebb4cb92418182628a57d74d82
+    [maroon]=fb3adcff47f99156a6abed7e23fc4228b0d8cf709b26b32273be10970e28947d
+    [peach]=6c7a3d438a4e5d6f9a8bc099a6c43912dc30fa973515b637e03d94fe40311feb
+    [yellow]=cf5438cf5dbbc10d9b17cad5655e2fb1f15d5196755ea0b3ecbee81b2c8682fe
+    [green]=85b9795c1482f2c317c1f83e878901f30e2b37ac8f95172dbef003eb8ef9246d
+    [teal]=9634fcec76afc927b919e709eaad19a9cae46ccc228040875208cf275dde5e45
+    [sky]=61a0dda411f24d3109f91cccc4be4582b60c29ad7e7a4701535236ed2497ccaf
+    [sapphire]=62914deafd7efb0475f01cacc55b4d94c3b27b9ba93d038872abed4833c16f4c
+    [blue]=a68fbed896d3066aec1fdaded561e8d20c855f0de4e193bdca4bc0d59ac1e333
+    [lavender]=08b5a99524bff09b3beedd292c5897433308a914a639236f04b15be60cef0829
+)
 SDDM_THEME_URL_BASE="https://github.com/catppuccin/sddm/releases/download"
 # Session file basename (without .desktop) in /usr/share/wayland-sessions, from the hyprland package.
 NUSKU_SESSION="hyprland"
@@ -32,7 +49,7 @@ sddm_prepare_background_dir() {
 
 # sddm_install_theme ACCENT: download the pinned catppuccin/sddm release and install it.
 sddm_install_theme() {
-    local accent="${1:?accent needed}" name themes dir tmp url main
+    local accent="${1:?accent needed}" name themes dir tmp url main sum
     name="catppuccin-mocha-$accent"
     themes="${NUSKU_SDDM_THEMES:-/usr/share/sddm/themes}"
     dir="$themes/$name"
@@ -40,19 +57,14 @@ sddm_install_theme() {
         log_info "SDDM theme $name $SDDM_THEME_VERSION already installed"
     else
         tmp="$(mktemp -d)"
+        trap 'rm -rf "$tmp"' RETURN
         url="$SDDM_THEME_URL_BASE/$SDDM_THEME_VERSION/$name-sddm.zip"
-        if ! (run curl -fsSL -o "$tmp/theme.zip" "$url"); then
-            rm -rf "$tmp"
-            exit 1
-        fi
-        if ! (run bsdtar -xf "$tmp/theme.zip" -C "$tmp"); then
-            rm -rf "$tmp"
-            exit 1
-        fi
-        [ -f "$tmp/$name/Main.qml" ] || {
-            rm -rf "$tmp"
-            die "SDDM theme archive has no $name/Main.qml"
-        }
+        run curl -fsSL -o "$tmp/theme.zip" "$url"
+        sum="$(sha256sum "$tmp/theme.zip" | cut -d" " -f1)"
+        [ "$sum" = "${SDDM_THEME_SHA256[$accent]:-}" ] ||
+            die "SDDM theme checksum mismatch for $name (got $sum)"
+        run bsdtar -xf "$tmp/theme.zip" -C "$tmp"
+        [ -f "$tmp/$name/Main.qml" ] || die "SDDM theme archive has no $name/Main.qml"
         main="$tmp/$name/Main.qml"
         if ! grep -q 'fillMode: Image.PreserveAspectCrop' "$main"; then
             log_warn "SDDM theme Main.qml lacks PreserveAspectCrop; patching"
@@ -66,6 +78,8 @@ sddm_install_theme() {
         run sudo mkdir -p "$themes"
         run sudo rm -rf "$dir"
         run sudo cp -r "$tmp/$name" "$dir"
+        run sudo chmod -R a+rX "$dir"
+        trap - RETURN
         rm -rf "$tmp"
     fi
     _sys_install_file "$NUSKU_ROOT/sddm/theme.conf.user.tmpl" "$dir/theme.conf.user"
@@ -101,7 +115,7 @@ services_enable() {
     run sudo systemctl enable "${units[@]}"
     # User units may be socket-activated or preset-enabled: a failure here is not fatal.
     for u in pipewire pipewire-pulse wireplumber; do
-        (run sudo systemctl --global enable "$u") ||
+        run_soft sudo systemctl --global enable "$u" ||
             log_warn "Could not enable user unit $u (already handled by presets?)"
     done
 }

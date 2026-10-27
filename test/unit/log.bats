@@ -63,3 +63,15 @@ in_sub() {
     in_sub 'log_error boom; log_warn w; run echo x; echo "$NUSKU_LOG" >"$BATS_TEST_TMPDIR/path"'
     ! grep -q $'\033' "$(cat "$BATS_TEST_TMPDIR/path")"
 }
+
+@test "run_soft returns the command status and never dies" {
+    run in_sub 'run_soft sh -c "echo hi; exit 3"; echo "rc=$?"; echo after'
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"hi"* && "$output" == *"rc=3"* && "$output" == *"after"* ]]
+    [[ "$output" != *"install failed"* ]]
+}
+
+@test "run_soft logs the command and its output" {
+    in_sub 'run_soft echo soft-out; echo "$NUSKU_LOG" >"$BATS_TEST_TMPDIR/path"'
+    grep -q 'soft-out' "$(cat "$BATS_TEST_TMPDIR/path")"
+}
