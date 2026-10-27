@@ -134,7 +134,6 @@ theme_render_all() {
         ours[${rels[$n]}]=1
     done
     if [ "${#ours[@]}" -gt 0 ]; then
-        printf '%s
-' "${!ours[@]}" | sort -u >"$manifest"
+        printf '%s\n' "${!ours[@]}" | sort -u >"$manifest"
     fi
 }
