@@ -16,7 +16,7 @@ backup_dir() {
 # backup_file PATH: copy PATH (if it exists) into the run's backup dir, keeping its layout.
 backup_file() {
     local path="${1:?backup_file needs a path}" rel dest d
-    [ -e "$path" ] || return 0
+    [ -e "$path" ] || [ -L "$path" ] || return 0
     # Fix the run id here: $(backup_dir) below runs in a subshell and could not export it.
     if [ -z "${NUSKU_RUN_ID:-}" ]; then
         NUSKU_RUN_ID="$(date +%Y%m%d-%H%M%S)"

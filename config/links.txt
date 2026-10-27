@@ -1,0 +1,16 @@
+# Nusku dotfile manifest: <src relative to repo> <dest relative to $HOME>
+# A glob in src links each match into the dest directory by basename.
+config/hypr .config/hypr
+config/waybar .config/waybar
+config/swaync .config/swaync
+config/rofi .config/rofi
+config/kitty .config/kitty
+config/btop .config/btop
+config/fastfetch .config/fastfetch
+config/starship.toml .config/starship.toml
+config/zsh/zshrc .zshrc
+config/gtk-3.0/gtk.css .config/gtk-3.0/gtk.css
+config/gtk-4.0/gtk.css .config/gtk-4.0/gtk.css
+config/qt6ct .config/qt6ct
+config/qt5ct .config/qt5ct
+scripts/nusku-* .local/bin
