@@ -1,0 +1,6 @@
+# nvidia-dkms (proprietary) no longer exists in the repos; nvidia-open-dkms is the only repo driver.
+nvidia-open-dkms
+nvidia-utils
+egl-wayland
+libva-nvidia-driver
+linux-headers
