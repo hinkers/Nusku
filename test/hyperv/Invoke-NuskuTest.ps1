@@ -199,8 +199,10 @@ try {
     if ($proc.ExitCode -ne 0) { Stop-WithError 'git ls-files failed.' }
 
     $text  = [System.Text.Encoding]::UTF8.GetString([System.IO.File]::ReadAllBytes($rawList))
-    $files = $text.Split([char]0, [System.StringSplitOptions]::RemoveEmptyEntries) |
-        Where-Object { $_ -notlike 'test/screenshots/*' } |
+    # .NET Framework has no Split(char, options) overload, so pass a char[]
+    # explicitly; also drop empty entries (the trailing NUL) defensively.
+    $files = $text.Split([char[]]@([char]0), [System.StringSplitOptions]::RemoveEmptyEntries) |
+        Where-Object { $_ -and $_ -notlike 'test/screenshots/*' } |
         Where-Object { Test-Path -LiteralPath $_ -PathType Leaf }   # drop files deleted but not yet committed
     $bytes = [System.Text.Encoding]::UTF8.GetBytes((($files -join [char]0) + [char]0))
     [System.IO.File]::WriteAllBytes($list, $bytes)
