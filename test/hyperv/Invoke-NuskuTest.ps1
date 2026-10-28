@@ -273,7 +273,15 @@ while ($hyprUp -and (Get-Date) -lt $deadline) {
     Start-Sleep -Seconds 2
 }
 if ($hyprUp -and -not $waybarUp) { Write-Host '    waybar did not start within 30 s after Hyprland' -ForegroundColor Yellow }
-Start-Sleep -Seconds 3   # let hyprpaper draw the wallpaper
+# Let the wallpaper come up: hyprpaper, or swaybg after nusku-wallpaper's ~5 s
+# wait for hyprpaper where it cannot run (Hyper-V).
+$deadline = (Get-Date).AddSeconds(20)
+while ($hyprUp -and (Get-Date) -lt $deadline) {
+    $null = Invoke-Remote 'pgrep -x hyprpaper >/dev/null || pgrep -x swaybg >/dev/null'
+    if ($script:RemoteExit -eq 0) { break }
+    Start-Sleep -Seconds 2
+}
+Start-Sleep -Seconds 3   # let it draw
 
 # --------------------------------------------------------------- 6. checks
 Write-Step 'Checking services and processes'
@@ -298,10 +306,23 @@ foreach ($svc in 'sddm', 'NetworkManager', 'bluetooth', 'power-profiles-daemon')
 $null = Invoke-Remote "pgrep -x Hyprland >/dev/null || pgrep -f -x '.*[Hh]yprland' >/dev/null"
 if ($script:RemoteExit -eq 0) { Add-Result 'process Hyprland' 'PASS' 'running' }
 else { Add-Result 'process Hyprland' 'FAIL' 'not running' }
-foreach ($proc in 'waybar', 'swaync', 'hyprpaper') {
+foreach ($proc in 'waybar', 'swaync') {
     $null = Invoke-Remote "pgrep -x $proc >/dev/null"
     if ($script:RemoteExit -eq 0) { Add-Result "process $proc" 'PASS' 'running' }
     else { Add-Result "process $proc" 'FAIL' 'not running' }
+}
+# hyprpaper 0.8 needs linux-dmabuf, which Hyprland only offers with a DRM render
+# node; Hyper-V has none, so nusku-wallpaper falls back to swaybg there.
+$null = Invoke-Remote 'pgrep -x hyprpaper >/dev/null'
+if ($script:RemoteExit -eq 0) {
+    Add-Result 'process hyprpaper' 'PASS' 'running'
+} else {
+    $null = Invoke-Remote 'pgrep -x swaybg >/dev/null'
+    if ($script:RemoteExit -eq 0) {
+        Add-Result 'process hyprpaper' 'WARN' 'not running (no render node); swaybg fallback running'
+    } else {
+        Add-Result 'process hyprpaper' 'FAIL' 'not running, and no swaybg fallback'
+    }
 }
 
 $results | Format-Table -AutoSize | Out-String | Write-Host
@@ -333,11 +354,15 @@ function Save-Screenshot([string]$File) {
 $script:shotFailed = $false
 
 Write-Step 'Taking screenshots'
+# Hyprland 0.56 shows a timed ".conf format is deprecated" notice at login; clear
+# it so it does not cover the bar, and park the cursor off the bar (no tooltips).
+$null = Invoke-Remote ($envPreamble + "`nhyprctl dismissnotify >/dev/null; hyprctl dispatch movecursor 512 400 >/dev/null")
+Start-Sleep -Seconds 1
 Save-Screenshot 'desktop.png'
 $null = Invoke-Remote ($envPreamble + "`nhyprctl dispatch exec 'rofi -show drun'")
-Start-Sleep -Seconds 2
+Start-Sleep -Seconds 4   # software rendering: give rofi time to map and animate in
 Save-Screenshot 'rofi.png'
-$null = Invoke-Remote 'pkill rofi || true'
+$null = Invoke-Remote 'pkill -x -u "$(id -u)" rofi || true'
 
 # ---------------------------------------------------------------- finish
 if (-not $KeepRunning) {
