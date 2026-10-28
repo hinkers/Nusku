@@ -312,7 +312,7 @@ apps_batches() {
 # apps_install_aur_soft BATCHES: one helper call per app with all its AUR names; a failure is
 # recorded in NUSKU_APP_FAILURES and the run goes on.
 apps_install_aur_soft() {
-    local kind id name helper
+    local kind id name helper list
     local -a order=()
     local -A names=()
     while read -r kind id name; do
@@ -325,8 +325,10 @@ apps_install_aur_soft() {
     [ -n "$helper" ] || die "AUR_HELPER is not set"
     for id in "${order[@]}"; do
         # shellcheck disable=SC2086  # names are space-separated package names
-        run_soft "$helper" -S --needed --noconfirm ${names[$id]} ||
-            NUSKU_APP_FAILURES+=("$(apps_label "$id"):${names[$id]// /, } (AUR install failed)")
+        run_soft "$helper" -S --needed --noconfirm ${names[$id]} || {
+            list="${names[$id]# }"
+            NUSKU_APP_FAILURES+=("$(apps_label "$id"): ${list// /, } (AUR install failed)")
+        }
     done
 }
 

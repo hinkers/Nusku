@@ -128,5 +128,9 @@ pkg_flathub_remote() {
 
 # pkg_install_flatpak ID: install a Flatpak app from Flathub (soft).
 pkg_install_flatpak() {
+    if flatpak info --system "$1" >/dev/null 2>&1; then
+        log_info "Flatpak $1 is already installed"
+        return 0
+    fi
     run_soft sudo flatpak install --system -y --noninteractive flathub "$1"
 }

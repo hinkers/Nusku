@@ -206,7 +206,7 @@ CONF
         printf "F:%s\n" "${NUSKU_APP_FAILURES[@]}"'
     [ "$status" -eq 0 ]
     [[ "$output" == *"rc=0"* ]]
-    [[ "$output" == *"F:Heroic Games Launcher"* ]]
+    [[ "$output" == *"F:Heroic Games Launcher: heroic-games-launcher-bin (AUR install failed)"* ]]
     [[ "$output" != *"F:ProtonUp"* ]]
     grep -q 'paru -S --needed --noconfirm heroic-games-launcher-bin' "$CALLS"
     grep -q 'paru -S --needed --noconfirm protonup-qt' "$CALLS"
@@ -261,4 +261,25 @@ CONF
     [ "$status" -eq 0 ]
     grep -q 'pacman -S --needed --noconfirm vlc rustup$' "$CALLS"
     [ "$(grep -c -e '--ask=4' "$CALLS")" -eq 0 ]
+}
+
+@test "an already-installed flatpak is skipped, not reported as failed" {
+    printf '#!/bin/sh\necho "sudo $*" >>"$CALLS"\nexit 1\n' >"$STUBS/sudo"
+    printf '#!/bin/sh\ncase "$1" in info) exit 0 ;; esac\nexit 1\n' >"$STUBS/flatpak"
+    chmod +x "$STUBS/sudo" "$STUBS/flatpak"
+    run in_sub 'apps_install_flatpak_soft "$(printf "flatpak bitwarden com.bitwarden.desktop\n")"
+        echo "n=${#NUSKU_APP_FAILURES[@]}"'
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"n=0"* ]]
+    [[ "$output" == *"already installed"* ]]
+    [ "$(grep -c 'flatpak install' "$CALLS")" -eq 0 ]
+}
+
+@test "a flatpak that is not installed yet still installs" {
+    printf '#!/bin/sh\necho "sudo $*" >>"$CALLS"\n' >"$STUBS/sudo"
+    printf '#!/bin/sh\nexit 1\n' >"$STUBS/flatpak"
+    chmod +x "$STUBS/sudo" "$STUBS/flatpak"
+    run in_sub 'pkg_install_flatpak com.x.App'
+    [ "$status" -eq 0 ]
+    grep -q 'sudo flatpak install --system -y --noninteractive flathub com.x.App' "$CALLS"
 }
