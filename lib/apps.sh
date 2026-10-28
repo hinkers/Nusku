@@ -210,3 +210,150 @@ apps_default_missing() {
         answers_set LANGS ""
     fi
 }
+
+# --- Installing the picks -------------------------------------------------------------
+# Optional installs that fail are listed here ("<label>: <what failed>") and shown in the
+# summary. Update it only from functions called directly: $(...) runs in a subshell.
+NUSKU_APP_FAILURES=()
+
+# apps_gpu32 GPU NVIDIA_MODULE: the 32-bit driver tokens Steam needs, space-separated.
+apps_gpu32() {
+    local gpu="${1:-}" mod="${2:-}" igpu="" nv=""
+    case "$gpu" in
+        amd | hybrid-amd) igpu="lib32-mesa lib32-vulkan-radeon" ;;
+        intel | hybrid-intel) igpu="lib32-mesa lib32-vulkan-intel" ;;
+        vm) igpu="lib32-mesa lib32-vulkan-swrast" ;;
+    esac
+    case "$gpu" in
+        nvidia | hybrid-*)
+            if [ "$mod" = proprietary ]; then
+                nv="aur:lib32-nvidia-580xx-utils"
+            else
+                nv="lib32-nvidia-utils"
+            fi
+            ;;
+    esac
+    printf '%s\n' "${igpu:+$igpu }$nv" | sed 's/ *$//'
+}
+
+# _apps_selected [say]: the picked app and language ids that apply here, one per line; a
+# btrfs-only app on another filesystem is skipped (and logged when asked to "say").
+_apps_selected() {
+    local id
+    for id in $(answers_get APPS); do
+        if apps_has_flag "$id" btrfs && ! apps_root_is_btrfs; then
+            [ "${1:-}" != say ] || log_info "Skipping $(apps_label "$id"): / is not btrfs"
+            continue
+        fi
+        printf '%s\n' "$id"
+    done
+    for id in $(answers_get LANGS); do
+        printf '%s\n' "$id"
+    done
+}
+
+# apps_needs_multilib: status 0 when a selected app needs the multilib repo.
+apps_needs_multilib() {
+    local id
+    while IFS= read -r id; do
+        if apps_has_flag "$id" multilib || apps_has_flag "$id" gpu32; then
+            return 0
+        fi
+    done < <(_apps_selected)
+    return 1
+}
+
+# apps_batches GPU NVIDIA_MODULE: what to install, one line each: "repo NAME", "aur APP_ID NAME"
+# or "flatpak APP_ID ID". The gpu32 app also gets the GPU's 32-bit driver; if that driver is an
+# AUR package, the app's own packages join it in the AUR batch so they install in one transaction.
+apps_batches() {
+    local gpu="${1:-}" mod="${2:-}" id t force g32_done=0 flat=0 has_aur
+    local -a lines=() own=() items=() g32=()
+    while IFS= read -r id; do
+        items=()
+        mapfile -t own < <(apps_packages "$id")
+        force=0
+        if [ "$g32_done" -eq 0 ] && apps_has_flag "$id" gpu32; then
+            g32_done=1
+            read -ra g32 <<<"$(apps_gpu32 "$gpu" "$mod")"
+            has_aur=0
+            for t in "${g32[@]}"; do
+                case "$t" in aur:*) has_aur=1 ;; esac
+                items+=("0 $t")
+            done
+            force="$has_aur"
+        fi
+        for t in "${own[@]}"; do
+            items+=("$force $t")
+        done
+        for t in "${items[@]}"; do
+            force="${t%% *}"
+            t="${t#* }"
+            case "$t" in
+                flatpak:*)
+                    flat=1
+                    lines+=("flatpak $id ${t#flatpak:}")
+                    ;;
+                aur:*) lines+=("aur $id ${t#aur:}") ;;
+                *)
+                    if [ "$force" = 1 ]; then
+                        lines+=("aur $id $t")
+                    else
+                        lines+=("repo $t")
+                    fi
+                    ;;
+            esac
+        done
+    done < <(_apps_selected say)
+    [ "$flat" -eq 0 ] || lines+=("repo flatpak")
+    [ "${#lines[@]}" -eq 0 ] || printf '%s\n' "${lines[@]}"
+}
+
+# apps_install_aur_soft BATCHES: one helper call per app with all its AUR names; a failure is
+# recorded in NUSKU_APP_FAILURES and the run goes on.
+apps_install_aur_soft() {
+    local kind id name helper
+    local -a order=()
+    local -A names=()
+    while read -r kind id name; do
+        [ "$kind" = aur ] || continue
+        [ -n "${names[$id]+x}" ] || order+=("$id")
+        names[$id]="${names[$id]:-} $name"
+    done <<<"$1"
+    [ "${#order[@]}" -gt 0 ] || return 0
+    helper="$(answers_get AUR_HELPER)"
+    [ -n "$helper" ] || die "AUR_HELPER is not set"
+    for id in "${order[@]}"; do
+        # shellcheck disable=SC2086  # names are space-separated package names
+        run_soft "$helper" -S --needed --noconfirm ${names[$id]} ||
+            NUSKU_APP_FAILURES+=("$(apps_label "$id"):${names[$id]// /, } (AUR install failed)")
+    done
+}
+
+# apps_install_flatpak_soft BATCHES: add Flathub, then one soft install per flatpak line.
+apps_install_flatpak_soft() {
+    local kind id fid any=0
+    while read -r kind id fid; do
+        [ "$kind" = flatpak ] || continue
+        if [ "$any" -eq 0 ]; then
+            any=1
+            pkg_flathub_remote || true
+        fi
+        pkg_install_flatpak "$fid" || NUSKU_APP_FAILURES+=("$(apps_label "$id"): $fid (Flatpak install failed)")
+    done <<<"$1"
+}
+
+# apps_summary_failures: the "Not installed" block for the summary; nothing when all went well.
+apps_summary_failures() {
+    [ "${#NUSKU_APP_FAILURES[@]}" -gt 0 ] || return 0
+    local f red="" off=""
+    if [ -t 2 ]; then
+        red=$'\033[31m'
+        off=$'\033[0m'
+    fi
+    printf '\n%sNot installed (see the log):%s\n' "$red" "$off"
+    for f in "${NUSKU_APP_FAILURES[@]}"; do
+        printf '%s  - %s%s\n' "$red" "$f" "$off"
+    done
+    printf '%sFix the cause and run ./install.sh --update to retry.%s\n' "$red" "$off"
+}

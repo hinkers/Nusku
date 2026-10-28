@@ -257,8 +257,19 @@ step_packages() {
     [ -z "$text" ] || mapfile -t -O "${#repo_names[@]}" repo_names <<<"$text"
     text="$(_read_lists "${aur_lists[@]}")"
     [ -z "$text" ] || mapfile -t aur_names <<<"$text"
-    pkg_install_repo "${repo_names[@]}"
+    local gpu mod batches
+    gpu="$(answers_get GPU)"
+    mod="$(answers_get NVIDIA_MODULE)"
+    batches="$(apps_batches "$gpu" "$mod")"
+    text="$(awk '$1 == "repo" && !seen[$2]++ { print $2 }' <<<"$batches")"
+    [ -z "$text" ] || mapfile -t -O "${#repo_names[@]}" repo_names <<<"$text"
+    if apps_needs_multilib; then
+        pkg_enable_multilib
+    fi
+    pkg_install_repo_swap_rust "${repo_names[@]}"
     pkg_install_aur "${aur_names[@]}"
+    apps_install_aur_soft "$batches"
+    apps_install_flatpak_soft "$batches"
 }
 
 step_gpu() {
@@ -334,10 +345,12 @@ step_summary() {
         printf '\nNusku is installed.\n'
         printf '  GPU:     %s\n' "$gpu"
         printf '  Accent:  %s\n' "$(answers_get ACCENT)"
+        printf '  Apps:    %s apps, %s languages\n' "$(wc -w <<<"$(answers_get APPS)")" "$(wc -w <<<"$(answers_get LANGS)")"
         printf '  Log:     %s\n' "$NUSKU_LOG"
         if [ -d "$bdir" ]; then
             printf '  Backups: %s\n' "$bdir"
         fi
+        apps_summary_failures
         printf '\nNext step: Reboot to log in.\n'
     } | tee -a "$NUSKU_LOG" >&2
 }

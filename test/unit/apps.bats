@@ -298,3 +298,118 @@ ask() {
     [ "$status" -eq 0 ]
     [ "${lines[0]}" = "APPS=neovim gh claude-code firefox discord obsidian" ]
 }
+
+# --- Installing the picks -------------------------------------------------------------
+
+@test "apps_gpu32 amd" {
+    run in_sub 'apps_gpu32 amd open'
+    [ "$status" -eq 0 ]
+    [ "$output" = "lib32-mesa lib32-vulkan-radeon" ]
+}
+
+@test "apps_gpu32 intel" {
+    run in_sub 'apps_gpu32 intel open'
+    [ "$output" = "lib32-mesa lib32-vulkan-intel" ]
+}
+
+@test "apps_gpu32 nvidia open" {
+    run in_sub 'apps_gpu32 nvidia open'
+    [ "$output" = "lib32-nvidia-utils" ]
+}
+
+@test "apps_gpu32 nvidia proprietary" {
+    run in_sub 'apps_gpu32 nvidia proprietary'
+    [ "$output" = "aur:lib32-nvidia-580xx-utils" ]
+}
+
+@test "apps_gpu32 hybrid-intel open" {
+    run in_sub 'apps_gpu32 hybrid-intel open'
+    [ "$output" = "lib32-mesa lib32-vulkan-intel lib32-nvidia-utils" ]
+}
+
+@test "apps_gpu32 hybrid-intel proprietary" {
+    run in_sub 'apps_gpu32 hybrid-intel proprietary'
+    [ "$output" = "lib32-mesa lib32-vulkan-intel aur:lib32-nvidia-580xx-utils" ]
+}
+
+@test "apps_gpu32 hybrid-amd open" {
+    run in_sub 'apps_gpu32 hybrid-amd open'
+    [ "$output" = "lib32-mesa lib32-vulkan-radeon lib32-nvidia-utils" ]
+}
+
+@test "apps_gpu32 vm" {
+    run in_sub 'apps_gpu32 vm open'
+    [ "$output" = "lib32-mesa lib32-vulkan-swrast" ]
+}
+
+@test "steam on legacy nvidia goes through the AUR helper together with the driver" {
+    run in_sub 'answers_set APPS steam; apps_batches nvidia proprietary'
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"aur steam lib32-nvidia-580xx-utils"* ]]
+    [[ "$output" == *"aur steam steam"* ]]
+    [[ "$output" != *"repo steam"* ]]
+    [[ "$output" != *"lib32-nvidia-utils"* ]]
+}
+
+@test "steam on amd stays in the repo batch" {
+    run in_sub 'answers_set APPS steam; apps_batches amd open'
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"repo steam"* ]]
+    [[ "$output" == *"repo lib32-vulkan-radeon"* ]]
+    [[ "$output" != *"aur "* ]]
+}
+
+@test "bitwarden adds flatpak to the repo batch" {
+    run in_sub 'answers_set APPS bitwarden; apps_batches amd open'
+    [[ "$output" == *"flatpak bitwarden com.bitwarden.desktop"* ]]
+    [[ "$output" == *"repo flatpak"* ]]
+}
+
+@test "languages contribute packages" {
+    run in_sub 'answers_set LANGS python; apps_batches amd open'
+    [[ "$output" == *"repo python"* ]]
+    [[ "$output" == *"repo uv"* ]]
+}
+
+@test "aur apps are batched under their own id" {
+    run in_sub 'answers_set APPS "heroic"; apps_batches amd open'
+    [ "$output" = "aur heroic heroic-games-launcher-bin" ]
+}
+
+@test "apps_batches skips btrfs apps on a non-btrfs root and says so" {
+    NUSKU_ROOT_FSTYPE=ext4 run in_sub 'answers_set APPS "snapper gparted"; apps_batches amd open 2>&1'
+    [[ "$output" == *"Skipping Snapper: / is not btrfs"* ]]
+    [[ "$output" == *"repo gparted"* ]]
+    [[ "$output" != *"repo snapper"* ]]
+}
+
+@test "apps_batches keeps btrfs apps on a btrfs root" {
+    NUSKU_ROOT_FSTYPE=btrfs run in_sub 'answers_set APPS snapper; apps_batches amd open'
+    [[ "$output" == *"repo snapper"* ]]
+}
+
+@test "apps_needs_multilib is true for multilib and gpu32 apps only" {
+    run in_sub 'answers_set APPS "gimp mangohud"; apps_needs_multilib'
+    [ "$status" -eq 0 ]
+    run in_sub 'answers_set APPS "gimp steam"; apps_needs_multilib'
+    [ "$status" -eq 0 ]
+    run in_sub 'answers_set APPS "gimp vlc"; apps_needs_multilib'
+    [ "$status" -ne 0 ]
+    run in_sub 'answers_set APPS ""; apps_needs_multilib'
+    [ "$status" -ne 0 ]
+}
+
+@test "summary lists failed apps" {
+    run in_sub 'NUSKU_APP_FAILURES=("Heroic Games Launcher: AUR install failed" "Bitwarden: flatpak install failed"); apps_summary_failures'
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"Not installed (see the log)"* ]]
+    [[ "$output" == *"Heroic Games Launcher: AUR install failed"* ]]
+    [[ "$output" == *"Bitwarden: flatpak install failed"* ]]
+    [[ "$output" == *"Fix the cause and run ./install.sh --update to retry."* ]]
+}
+
+@test "summary prints no failure block when nothing failed" {
+    run in_sub 'apps_summary_failures'
+    [ "$status" -eq 0 ]
+    [ -z "$output" ]
+}

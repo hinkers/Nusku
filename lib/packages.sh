@@ -79,3 +79,54 @@ aur_bootstrap() {
     _aur_build "$helper"
     _aur_helper_works "$helper" || die "AUR helper $helper still does not run after building it from source"
 }
+
+# pkg_install_repo_swap_rust NAME...: pkg_install_repo, except that rustup first replaces an
+# installed rust package (they conflict; --ask=4 answers the removal prompt).
+pkg_install_repo_swap_rust() {
+    local n swap=0
+    local -a rest=()
+    for n in "$@"; do
+        if [ "$n" = rustup ] && pacman -Qq rust >/dev/null 2>&1; then
+            swap=1
+        else
+            rest+=("$n")
+        fi
+    done
+    if [ "$swap" -eq 1 ]; then
+        log_warn "Replacing the rust package with rustup (needed for the Rust language option)"
+        run sudo pacman -S --needed --noconfirm --ask=4 rustup
+    fi
+    pkg_install_repo "${rest[@]}"
+}
+
+# pkg_enable_multilib: enable [multilib] in pacman.conf (NUSKU_ETC overrides /etc, for tests)
+# and refresh with a full upgrade; no-op when it is already enabled.
+pkg_enable_multilib() {
+    local conf="${NUSKU_ETC:-/etc}/pacman.conf" tmp
+    if grep -q '^\[multilib\]' "$conf"; then
+        return 0
+    fi
+    backup_file "$conf"
+    tmp="$(mktemp)"
+    if grep -q '^#\[multilib\]$' "$conf"; then
+        sed -e 's/^#\[multilib\]$/[multilib]/' -e '/^\[multilib\]$/{n;s/^#Include/Include/}' "$conf" >"$tmp"
+    else
+        {
+            cat "$conf"
+            printf '\n[multilib]\nInclude = /etc/pacman.d/mirrorlist\n'
+        } >"$tmp"
+    fi
+    run sudo install -m 644 "$tmp" "$conf"
+    rm -f "$tmp"
+    run sudo pacman -Syu --noconfirm
+}
+
+# pkg_flathub_remote: add the Flathub remote system-wide (soft: Flatpak apps just fail without it).
+pkg_flathub_remote() {
+    run_soft sudo flatpak remote-add --if-not-exists --system flathub https://dl.flathub.org/repo/flathub.flatpakrepo
+}
+
+# pkg_install_flatpak ID: install a Flatpak app from Flathub (soft).
+pkg_install_flatpak() {
+    run_soft sudo flatpak install --system -y --noninteractive flathub "$1"
+}

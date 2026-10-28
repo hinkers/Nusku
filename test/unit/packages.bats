@@ -10,7 +10,7 @@ setup() {
 }
 
 in_sub() {
-    PATH="$STUBS:$PATH" CALLS="$CALLS" bash -c 'source lib/log.sh; source lib/answers.sh; source lib/packages.sh; '"$1"
+    NUSKU_ROOT="$PWD" PATH="$STUBS:$PATH" CALLS="$CALLS" bash -c 'source lib/log.sh; source lib/answers.sh; source lib/backup.sh; source lib/apps.sh; source lib/packages.sh; '"$1"
 }
 
 @test "pkg_read_list strips comments and blanks" {
@@ -134,4 +134,131 @@ STUB
     run in_sub "aur_bootstrap yay"
     [ "$status" -ne 0 ]
     [[ "$output" == *"still does not run"* ]]
+}
+
+# --- Optional apps: multilib, flatpak, soft installs -----------------------------------
+
+# fake_sudo: logs the call, then really runs it (so stubbed pacman and a real install both work).
+fake_sudo() {
+    printf '#!/bin/sh\necho "sudo $*" >>"$CALLS"\n"$@"\n' >"$STUBS/sudo"
+    printf '#!/bin/sh\necho "pacman $*" >>"$CALLS"\n' >"$STUBS/pacman"
+    chmod +x "$STUBS/sudo" "$STUBS/pacman"
+}
+
+@test "pkg_enable_multilib uncomments only multilib" {
+    fake_sudo
+    mkdir -p "$BATS_TEST_TMPDIR/etc"
+    cat >"$BATS_TEST_TMPDIR/etc/pacman.conf" <<'CONF'
+[core]
+Include = /etc/pacman.d/mirrorlist
+
+#[multilib-testing]
+#Include = /etc/pacman.d/mirrorlist
+
+#[multilib]
+#Include = /etc/pacman.d/mirrorlist
+CONF
+    export NUSKU_ETC="$BATS_TEST_TMPDIR/etc"
+    run in_sub "pkg_enable_multilib"
+    [ "$status" -eq 0 ]
+    grep -qx '\[multilib\]' "$NUSKU_ETC/pacman.conf"
+    grep -qx '#\[multilib-testing\]' "$NUSKU_ETC/pacman.conf"
+    [ "$(grep -c '^#Include' "$NUSKU_ETC/pacman.conf")" -eq 1 ]
+    [ "$(grep -c '^Include' "$NUSKU_ETC/pacman.conf")" -eq 2 ]
+    [ "$(grep -A1 -x '\[multilib\]' "$NUSKU_ETC/pacman.conf" | tail -n1)" = "Include = /etc/pacman.d/mirrorlist" ]
+    [ "$(grep -c '^pacman -Syu --noconfirm' "$CALLS")" -eq 1 ]
+    : >"$CALLS"
+    cp "$NUSKU_ETC/pacman.conf" "$BATS_TEST_TMPDIR/before"
+    run in_sub "pkg_enable_multilib"
+    [ "$status" -eq 0 ]
+    cmp "$NUSKU_ETC/pacman.conf" "$BATS_TEST_TMPDIR/before"
+    [ ! -s "$CALLS" ]
+}
+
+@test "pkg_enable_multilib appends the block when missing" {
+    fake_sudo
+    mkdir -p "$BATS_TEST_TMPDIR/etc"
+    printf '[core]\nInclude = /etc/pacman.d/mirrorlist\n' >"$BATS_TEST_TMPDIR/etc/pacman.conf"
+    export NUSKU_ETC="$BATS_TEST_TMPDIR/etc"
+    run in_sub "pkg_enable_multilib"
+    [ "$status" -eq 0 ]
+    [ "$(grep -A1 -x '\[multilib\]' "$NUSKU_ETC/pacman.conf" | tail -n1)" = "Include = /etc/pacman.d/mirrorlist" ]
+    grep -q 'pacman -Syu --noconfirm' "$CALLS"
+    [ "$(grep -c 'pacman -Sy ' "$CALLS")" -eq 0 ]
+}
+
+@test "pkg_flathub_remote and pkg_install_flatpak use the system installation" {
+    printf '#!/bin/sh\necho "sudo $*" >>"$CALLS"\n' >"$STUBS/sudo"
+    chmod +x "$STUBS/sudo"
+    run in_sub "pkg_flathub_remote; pkg_install_flatpak com.x.App"
+    [ "$status" -eq 0 ]
+    grep -q 'sudo flatpak remote-add --if-not-exists --system flathub https://dl.flathub.org/repo/flathub.flatpakrepo' "$CALLS"
+    grep -q 'sudo flatpak install --system -y --noninteractive flathub com.x.App' "$CALLS"
+}
+
+@test "a failing optional AUR app is recorded and the run continues" {
+    printf '#!/bin/sh\necho "paru $*" >>"$CALLS"\ncase "$*" in *heroic-games-launcher-bin*) exit 1 ;; esac\n' >"$STUBS/paru"
+    chmod +x "$STUBS/paru"
+    run in_sub 'answers_set AUR_HELPER paru
+        batches=$(printf "aur heroic heroic-games-launcher-bin\naur protonup protonup-qt\n")
+        apps_install_aur_soft "$batches"
+        echo "rc=$?"
+        printf "F:%s\n" "${NUSKU_APP_FAILURES[@]}"'
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"rc=0"* ]]
+    [[ "$output" == *"F:Heroic Games Launcher"* ]]
+    [[ "$output" != *"F:ProtonUp"* ]]
+    grep -q 'paru -S --needed --noconfirm heroic-games-launcher-bin' "$CALLS"
+    grep -q 'paru -S --needed --noconfirm protonup-qt' "$CALLS"
+}
+
+@test "an app's AUR names go to the helper in one call" {
+    printf '#!/bin/sh\necho "paru $*" >>"$CALLS"\n' >"$STUBS/paru"
+    chmod +x "$STUBS/paru"
+    run in_sub 'answers_set AUR_HELPER paru
+        apps_install_aur_soft "$(printf "aur steam lib32-nvidia-580xx-utils\naur steam steam\n")"'
+    [ "$status" -eq 0 ]
+    [ "$(grep -c '^paru' "$CALLS")" -eq 1 ]
+    grep -q 'paru -S --needed --noconfirm lib32-nvidia-580xx-utils steam' "$CALLS"
+}
+
+@test "a failing flatpak is recorded and the run continues" {
+    printf '#!/bin/sh\necho "sudo $*" >>"$CALLS"\ncase "$*" in *remote-add*) ;; *com.bitwarden.desktop*) exit 1 ;; esac\n' >"$STUBS/sudo"
+    chmod +x "$STUBS/sudo"
+    run in_sub 'apps_install_flatpak_soft "$(printf "flatpak bitwarden com.bitwarden.desktop\nflatpak other org.o.App\n")"
+        printf "F:%s\n" "${NUSKU_APP_FAILURES[@]}"'
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"F:Bitwarden"* ]]
+    grep -q 'flatpak remote-add' "$CALLS"
+    grep -q 'flathub org.o.App' "$CALLS"
+}
+
+@test "no flatpak lines means no flathub remote" {
+    printf '#!/bin/sh\necho "sudo $*" >>"$CALLS"\n' >"$STUBS/sudo"
+    chmod +x "$STUBS/sudo"
+    run in_sub 'apps_install_flatpak_soft "$(printf "repo vlc\n")"'
+    [ "$status" -eq 0 ]
+    [ ! -s "$CALLS" ]
+}
+
+@test "rust is swapped for rustup with --ask=4" {
+    printf '#!/bin/sh\necho "sudo $*" >>"$CALLS"\n' >"$STUBS/sudo"
+    printf '#!/bin/sh\ncase "$*" in "-Qq rust") exit 0 ;; esac\nexit 1\n' >"$STUBS/pacman"
+    chmod +x "$STUBS/sudo" "$STUBS/pacman"
+    run in_sub "pkg_install_repo_swap_rust vlc rustup go"
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"Replacing the rust package with rustup (needed for the Rust language option)"* ]]
+    grep -q 'pacman -S --needed --noconfirm --ask=4 rustup' "$CALLS"
+    grep -q 'pacman -S --needed --noconfirm vlc go$' "$CALLS"
+    [ "$(grep -c 'rustup' "$CALLS")" -eq 1 ]
+}
+
+@test "rustup stays in the main batch when rust is not installed" {
+    printf '#!/bin/sh\necho "sudo $*" >>"$CALLS"\n' >"$STUBS/sudo"
+    printf '#!/bin/sh\nexit 1\n' >"$STUBS/pacman"
+    chmod +x "$STUBS/sudo" "$STUBS/pacman"
+    run in_sub "pkg_install_repo_swap_rust vlc rustup"
+    [ "$status" -eq 0 ]
+    grep -q 'pacman -S --needed --noconfirm vlc rustup$' "$CALLS"
+    [ "$(grep -c -e '--ask=4' "$CALLS")" -eq 0 ]
 }
