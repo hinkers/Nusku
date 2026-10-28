@@ -29,6 +29,8 @@ source "$REPO_ROOT/lib/theme.sh"
 source "$REPO_ROOT/lib/dotfiles.sh"
 # shellcheck source=lib/system.sh
 source "$REPO_ROOT/lib/system.sh"
+# shellcheck source=lib/hypr.sh
+source "$REPO_ROOT/lib/hypr.sh"
 
 SAVED_ANSWERS="${XDG_CONFIG_HOME:-$HOME/.config}/nusku/answers"
 NUSKU_CONFIG_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/nusku"
@@ -269,16 +271,8 @@ step_dotfiles() {
 step_local_files() {
     step "Local files"
     mkdir -p "$NUSKU_CONFIG_DIR"
-    local local_conf="$NUSKU_CONFIG_DIR/local.conf"
-    if [ ! -e "$local_conf" ]; then
-        cat >"$local_conf" <<'EOF'
-# Your own Hyprland settings. Nusku never overwrites this file.
-# It is sourced last by ~/.config/hypr/hyprland.conf, so anything here wins.
-# Example:
-#   monitor = DP-1, 2560x1440@144, 0x0, 1
-EOF
-        log_info "Created $local_conf"
-    fi
+    hypr_write_local_lua "$NUSKU_CONFIG_DIR/local.lua"
+    hypr_migrate_legacy "$NUSKU_CONFIG_DIR"
     # btop rewrites its config on exit, so it is a copy (made once), not a link.
     local btop_conf="$HOME/.config/btop/btop.conf"
     if [ ! -e "$btop_conf" ] && [ ! -L "$btop_conf" ]; then
@@ -286,8 +280,8 @@ EOF
         cp "$REPO_ROOT/config/btop/btop.conf" "$btop_conf"
         log_info "Created $btop_conf"
     fi
-    if [ ! -e "$NUSKU_CONFIG_DIR/gpu.conf" ]; then
-        gpu_hypr_conf "$(answers_get GPU)" "$(gpu_virt)" >"$NUSKU_CONFIG_DIR/gpu.conf"
+    if [ ! -e "$NUSKU_CONFIG_DIR/gpu.lua" ]; then
+        gpu_hypr_lua "$(answers_get GPU)" "$(gpu_virt)" >"$NUSKU_CONFIG_DIR/gpu.lua"
     fi
     sddm_prepare_background_dir
     local wp_state="$NUSKU_STATE_DIR/wallpapers" saved=""

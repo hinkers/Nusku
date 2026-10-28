@@ -53,45 +53,55 @@ in_sub() {
     [[ "$output" != *nvidia-prime* ]]
 }
 
-@test "gpu_hypr_conf vm microsoft" {
-    run in_sub "gpu_hypr_conf vm microsoft"
-    [[ "$output" == *no_hardware_cursors* ]]
-    [[ "$output" == *LIBGL_ALWAYS_SOFTWARE* ]]
-    [[ "$output" == *WLR_RENDERER_ALLOW_SOFTWARE* ]]
+@test "gpu_hypr_lua vm microsoft" {
+    run in_sub "gpu_hypr_lua vm microsoft"
+    [[ "$output" == *"hl.config({ cursor = { no_hardware_cursors = true } })"* ]]
+    [[ "$output" == *'hl.env("LIBGL_ALWAYS_SOFTWARE", "1")'* ]]
+    [[ "$output" == *'hl.env("WLR_RENDERER_ALLOW_SOFTWARE", "1")'* ]]
 }
 
-@test "gpu_hypr_conf vm pins monitor scale 1 (VMs report no physical size, auto picks 2)" {
-    run in_sub "gpu_hypr_conf vm microsoft"
-    [[ "$output" == *"monitor = , preferred, auto, 1"* ]]
-    run in_sub "gpu_hypr_conf vm kvm"
-    [[ "$output" == *"monitor = , preferred, auto, 1"* ]]
-    run in_sub "gpu_hypr_conf amd none"
-    [[ "$output" != *"monitor ="* ]]
+@test "gpu_hypr_lua vm pins monitor scale 1 (VMs report no physical size, auto picks 2)" {
+    local rule='hl.monitor({ output = "", mode = "preferred", position = "auto", scale = 1 })'
+    run in_sub "gpu_hypr_lua vm microsoft"
+    [[ "$output" == *"$rule"* ]]
+    run in_sub "gpu_hypr_lua vm kvm"
+    [[ "$output" == *"$rule"* ]]
+    run in_sub "gpu_hypr_lua amd none"
+    [[ "$output" != *"hl.monitor"* ]]
 }
 
-@test "gpu_hypr_conf vm kvm has cursor fix but no software GL" {
-    run in_sub "gpu_hypr_conf vm kvm"
+@test "gpu_hypr_lua vm kvm has cursor fix but no software GL" {
+    run in_sub "gpu_hypr_lua vm kvm"
     [[ "$output" == *no_hardware_cursors* ]]
     [[ "$output" != *LIBGL_ALWAYS_SOFTWARE* ]]
 }
 
-@test "gpu_hypr_conf hybrid-amd does not force NVIDIA" {
-    run in_sub "gpu_hypr_conf hybrid-amd none"
+@test "gpu_hypr_lua hybrid-amd does not force NVIDIA" {
+    run in_sub "gpu_hypr_lua hybrid-amd none"
     [[ "$output" != *__GLX_VENDOR_LIBRARY_NAME* ]]
     [[ "$output" != *LIBVA_DRIVER_NAME* ]]
 }
 
-@test "gpu_hypr_conf nvidia sets NVIDIA env" {
-    run in_sub "gpu_hypr_conf nvidia none"
-    [[ "$output" == *"env = LIBVA_DRIVER_NAME,nvidia"* ]]
-    [[ "$output" == *"env = __GLX_VENDOR_LIBRARY_NAME,nvidia"* ]]
-    [[ "$output" == *"env = NVD_BACKEND,direct"* ]]
+@test "gpu_hypr_lua nvidia sets NVIDIA env" {
+    run in_sub "gpu_hypr_lua nvidia none"
+    [[ "$output" == *'hl.env("LIBVA_DRIVER_NAME", "nvidia")'* ]]
+    [[ "$output" == *'hl.env("__GLX_VENDOR_LIBRARY_NAME", "nvidia")'* ]]
+    [[ "$output" == *'hl.env("NVD_BACKEND", "direct")'* ]]
 }
 
-@test "gpu_hypr_conf amd is comments only" {
-    run in_sub "gpu_hypr_conf amd none"
-    [[ "$output" == "#"* ]]
-    [ -z "$(printf '%s\n' "$output" | grep -v '^#')" ]
+@test "gpu_hypr_lua amd is Lua comments only" {
+    run in_sub "gpu_hypr_lua amd none"
+    [[ "$output" == "--"* ]]
+    [ -z "$(printf '%s\n' "$output" | grep -v '^--')" ]
+}
+
+@test "gpu_hypr_lua writes no hyprlang syntax for any GPU" {
+    local g
+    for g in amd intel nvidia hybrid-intel hybrid-amd vm; do
+        run in_sub "gpu_hypr_lua $g microsoft"
+        [ "$status" -eq 0 ]
+        [ -z "$(printf '%s\n' "$output" | grep -E '^(#|env *=|monitor *=|cursor *\{)')" ]
+    done
 }
 
 @test "gpu_vm_services" {
@@ -110,7 +120,7 @@ in_sub() {
     [ "$status" -eq 0 ]
 }
 
-@test "gpu_configure nvidia edits files, rebuilds once, writes gpu.conf" {
+@test "gpu_configure nvidia edits files, rebuilds once, writes gpu.lua" {
     printf 'GRUB_CMDLINE_LINUX_DEFAULT="quiet"\n' >"$BATS_TEST_TMPDIR/grub"
     printf 'MODULES=()\nHOOKS=(base udev autodetect modconf kms keyboard block filesystems)\n' >"$BATS_TEST_TMPDIR/mk"
     export NUSKU_GRUB_DEFAULT="$BATS_TEST_TMPDIR/grub" NUSKU_MKINITCPIO_CONF="$BATS_TEST_TMPDIR/mk"
@@ -124,7 +134,7 @@ in_sub() {
     [ "$(grep -c '^grub-mkconfig -o /boot/grub/grub.cfg' "$CALLS")" -eq 1 ]
     [ -n "$(find "$BATS_TEST_TMPDIR"/nusku/backup-* -name grub -type f)" ]
     [ -n "$(find "$BATS_TEST_TMPDIR"/nusku/backup-* -name mk -type f)" ]
-    grep -q NVD_BACKEND "$BATS_TEST_TMPDIR/cfg/nusku/gpu.conf"
+    grep -q NVD_BACKEND "$BATS_TEST_TMPDIR/cfg/nusku/gpu.lua"
     : >"$CALLS"
     run in_sub "answers_set GPU nvidia; answers_set NVIDIA_MODULE open; gpu_configure"
     [ "$status" -eq 0 ]
@@ -145,7 +155,8 @@ in_sub() {
     run in_sub "answers_set GPU amd; gpu_configure"
     [ "$status" -eq 0 ]
     [ "$(grep -c '^mkinitcpio' "$CALLS")" -eq 0 ]
-    [ -f "$BATS_TEST_TMPDIR/cfg/nusku/gpu.conf" ]
+    [ -f "$BATS_TEST_TMPDIR/cfg/nusku/gpu.lua" ]
+    [ ! -e "$BATS_TEST_TMPDIR/cfg/nusku/gpu.conf" ]
 }
 
 @test "gpu_package_lists nvidia proprietary includes gpu-nvidia.aur, open does not" {
