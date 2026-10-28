@@ -30,8 +30,18 @@ Any of the 14 Catppuccin accents works: rosewater flamingo pink mauve red maroon
 
 Nusku never overwrites these files:
 
-- `~/.config/nusku/local.conf` — Hyprland settings (monitors, input, extra binds). Sourced last, so it wins.
+- `~/.config/nusku/local.lua` — Hyprland settings (monitors, input, extra binds). Loaded last, so it wins.
 - `~/.config/nusku/local.zsh` — your own zsh additions, sourced at the end of `~/.zshrc`.
+
+Hyprland's config is [Lua](https://wiki.hypr.land/Configuring/) (`~/.config/hypr/hyprland.lua` and the modules next to it). A `local.lua` override looks like this:
+
+```lua
+hl.monitor({ output = "DP-1", mode = "2560x1440@144", position = "0x0", scale = 1 })
+hl.config({ input = { kb_layout = "us,de", kb_options = "grp:alt_shift_toggle" } })
+hl.bind("SUPER + B", hl.dsp.exec_cmd("firefox"))
+```
+
+Upgrading from an older Nusku that used `local.conf`: that file is kept but no longer read. The installer warns if it holds settings; move them into `local.lua` in the syntax above.
 
 ## Keybinds
 
@@ -63,7 +73,7 @@ Nusku never overwrites these files:
 | Shift + Print | Screenshot a window |
 | Ctrl + Print | Screenshot a monitor |
 
-Media, volume and brightness keys work as expected (also on the lock screen). The full list is in `config/hypr/keybinds.conf`.
+Media, volume and brightness keys work as expected (also on the lock screen). The full list is in `config/hypr/keybinds.lua`.
 
 ## Logs and backups
 
