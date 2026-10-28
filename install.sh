@@ -49,6 +49,7 @@ Options:
   --answers FILE   Read the answers from FILE and run without questions.
   --update         Reuse your saved answers, skip the questions and re-apply
                    every step (what nusku-update runs after pulling).
+  --apps           Change which optional apps and languages are installed, then re-apply.
   --reconfigure    Ask the questions again even if answers are saved.
   --no-reboot      Do not offer to reboot at the end.
   -h, --help       Show this help.
@@ -57,6 +58,7 @@ EOF
 
 opt_answers=""
 opt_update=0
+opt_apps=0
 opt_reconfigure=0
 opt_no_reboot=0
 while [ "$#" -gt 0 ]; do
@@ -74,6 +76,7 @@ while [ "$#" -gt 0 ]; do
             shift
             ;;
         --update) opt_update=1 && shift ;;
+        --apps) opt_apps=1 && shift ;;
         --reconfigure) opt_reconfigure=1 && shift ;;
         --no-reboot) opt_no_reboot=1 && shift ;;
         -h | --help)
@@ -90,6 +93,10 @@ done
 
 if [ "$opt_reconfigure" -eq 1 ] && { [ "$opt_update" -eq 1 ] || [ -n "$opt_answers" ]; }; then
     printf 'install.sh: --reconfigure cannot be combined with --update or --answers\n' >&2
+    exit 2
+fi
+if [ "$opt_apps" -eq 1 ] && { [ "$opt_update" -eq 1 ] || [ -n "$opt_answers" ] || [ "$opt_reconfigure" -eq 1 ]; }; then
+    printf 'install.sh: --apps cannot be combined with --update, --answers or --reconfigure\n' >&2
     exit 2
 fi
 if [ -n "$opt_answers" ]; then
@@ -188,6 +195,12 @@ step_questions() {
     done
     ask_menu ACCENT "Accent colour (Catppuccin Mocha)?" blue "${accent_menu[@]}"
 
+    if [ "$NUSKU_NONINTERACTIVE" = "1" ]; then
+        apps_default_missing
+    elif [ "$opt_apps" -eq 1 ] || [ -z "${NUSKU_ANSWERS[APPS]+x}" ]; then
+        apps_ask
+    fi
+
     answers_validate
     answers_save "$SAVED_ANSWERS"
     log_info "Answers: GPU=$(answers_get GPU) NVIDIA_MODULE=$(answers_get NVIDIA_MODULE) AUR_HELPER=$(answers_get AUR_HELPER) ACCENT=$(answers_get ACCENT)"
@@ -204,6 +217,11 @@ check_answers_early() {
     elif [ "$opt_update" -eq 1 ]; then
         step "Checking answers"
         [ -r "$SAVED_ANSWERS" ] || die "--update needs saved answers ($SAVED_ANSWERS); run ./install.sh first"
+        answers_load "$SAVED_ANSWERS"
+        answers_validate
+    elif [ "$opt_apps" -eq 1 ]; then
+        step "Checking answers"
+        [ -r "$SAVED_ANSWERS" ] || die "--apps needs saved answers ($SAVED_ANSWERS); run ./install.sh first"
         answers_load "$SAVED_ANSWERS"
         answers_validate
     fi

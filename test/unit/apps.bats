@@ -155,3 +155,124 @@ in_fix() {
     [ "$status" -eq 0 ]
     [ -z "$output" ]
 }
+
+# --- apps_ask: the picker, driven by a fake gum -----------------------------------------
+# The fake gum answers one call per reply file $GUM_DIR/replies/N (N = call number, from 1) and
+# records that call's arguments to $GUM_DIR/call-N. A reply of ESC makes it exit 130 (Esc pressed).
+# A multi-line reply is what a --no-limit checklist prints (one selected label per line).
+
+fake_gum() {
+    export GUM_DIR="$BATS_TEST_TMPDIR/gum"
+    mkdir -p "$GUM_DIR/replies" "$BATS_TEST_TMPDIR/bin"
+    cat >"$BATS_TEST_TMPDIR/bin/gum" <<'GUM'
+#!/usr/bin/env bash
+n=$(( $(cat "$GUM_DIR/n" 2>/dev/null || echo 0) + 1 ))
+echo "$n" >"$GUM_DIR/n"
+printf '%s\n' "$@" >"$GUM_DIR/call-$n"
+reply="$GUM_DIR/replies/$n"
+[ -f "$reply" ] || exit 130
+if [ "$(cat "$reply")" = ESC ]; then exit 130; fi
+cat "$reply"
+GUM
+    chmod +x "$BATS_TEST_TMPDIR/bin/gum"
+    local i=1 r
+    for r in "$@"; do
+        printf '%s\n' "$r" >"$GUM_DIR/replies/$i"
+        i=$((i + 1))
+    done
+}
+
+# Run apps_ask (real catalogue) after SETUP, then print APPS and LANGS.
+ask() {
+    PATH="$BATS_TEST_TMPDIR/bin:$PATH" bash -c \
+        'source lib/log.sh; source lib/answers.sh; source lib/apps.sh; '"$1"'; apps_ask >/dev/null 2>&1; echo "APPS=$(answers_get APPS)"; echo "LANGS=$(answers_get LANGS)"'
+}
+
+@test "fresh picker defaults to the starred apps" {
+    fake_gum Done
+    run ask ':'
+    [ "$status" -eq 0 ]
+    [ "${lines[0]}" = "APPS=neovim gh claude-code firefox discord obsidian spotify vlc" ]
+    [ "${lines[1]}" = "LANGS=" ]
+}
+
+@test "group menu shows counts and Done" {
+    fake_gum Done
+    run ask ':'
+    [ "$status" -eq 0 ]
+    grep -qxF 'Optional apps — pick a group to change, then Done' "$GUM_DIR/call-1"
+    grep -qxF 'Dev (3/6)' "$GUM_DIR/call-1"
+    grep -qxF 'Everyday (3/8)' "$GUM_DIR/call-1"
+    grep -qxF 'Done' "$GUM_DIR/call-1"
+}
+
+@test "opening Media and unticking Spotify" {
+    fake_gum 'Media (2/4)' '★ VLC' Done
+    run ask ':'
+    [ "$status" -eq 0 ]
+    [ "${lines[0]}" = "APPS=neovim gh claude-code firefox discord obsidian vlc" ]
+    grep -qxF 'Media — space toggles, ctrl+a selects all, enter confirms' "$GUM_DIR/call-2"
+    grep -qxF -- '--no-limit' "$GUM_DIR/call-2"
+    grep -qxF '★ Spotify,★ VLC' "$GUM_DIR/call-2"
+}
+
+@test "Dev opens the language picker" {
+    fake_gum 'Dev (3/6)' '★ Neovim (LazyVim)' $'Python\nRust' Done
+    run ask ':'
+    [ "$status" -eq 0 ]
+    [[ "${lines[0]}" == "APPS=neovim "* ]]
+    [[ "${lines[0]}" != *" gh "* && "${lines[0]}" != *claude-code* ]]
+    [ "${lines[1]}" = "LANGS=python rust" ]
+    grep -qxF 'Languages — runtimes, tools and Neovim support' "$GUM_DIR/call-3"
+}
+
+@test "Esc in a group keeps its selection" {
+    fake_gum 'Media (2/4)' ESC Done
+    run ask ':'
+    [ "$status" -eq 0 ]
+    [ "${lines[0]}" = "APPS=neovim gh claude-code firefox discord obsidian spotify vlc" ]
+}
+
+@test "re-asking starts from saved picks" {
+    fake_gum Done
+    run ask "answers_set APPS gimp; answers_set LANGS go"
+    [ "$status" -eq 0 ]
+    [ "${lines[0]}" = "APPS=gimp" ]
+    [ "${lines[1]}" = "LANGS=go" ]
+    grep -qxF 'Creative (1/5)' "$GUM_DIR/call-1"
+    grep -qxF 'Dev (0/6)' "$GUM_DIR/call-1"
+}
+
+@test "snapper not offered on ext4" {
+    export NUSKU_ROOT_FSTYPE=ext4
+    fake_gum 'System tools (0/4)' ESC Done
+    run ask ':'
+    [ "$status" -eq 0 ]
+    grep -qxF 'System tools (0/4)' "$GUM_DIR/call-1"
+    run grep -c 'Snapper' "$GUM_DIR/call-2"
+    [ "$output" = 0 ]
+    grep -qF 'GParted' "$GUM_DIR/call-2"
+}
+
+@test "snapper offered on btrfs" {
+    export NUSKU_ROOT_FSTYPE=btrfs
+    fake_gum 'System tools (0/5)' ESC Done
+    run ask ':'
+    [ "$status" -eq 0 ]
+    grep -qF 'Snapper' "$GUM_DIR/call-2"
+}
+
+@test "non-interactive without APPS installs no optional apps" {
+    run in_sub 'export NUSKU_NONINTERACTIVE=1; apps_default_missing; echo "APPS=[$(answers_get APPS)] LANGS=[$(answers_get LANGS)]"; [ -n "${NUSKU_ANSWERS[APPS]+x}" ] && echo stored'
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"No optional apps selected (add some with ./install.sh --apps)"* ]]
+    [[ "$output" == *"APPS=[] LANGS=[]"* ]]
+    [[ "$output" == *stored* ]]
+}
+
+@test "non-interactive with APPS saved keeps it and stays quiet" {
+    run in_sub 'export NUSKU_NONINTERACTIVE=1; answers_set APPS gimp; apps_default_missing; echo "APPS=[$(answers_get APPS)] LANGS=[$(answers_get LANGS)]"'
+    [ "$status" -eq 0 ]
+    [[ "$output" != *"No optional apps"* ]]
+    [[ "$output" == *"APPS=[gimp] LANGS=[]"* ]]
+}

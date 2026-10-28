@@ -76,3 +76,35 @@ setup() {
     [[ "$output" == *"needs saved answers"* ]]
     [ ! -s "$SUDO_ARGS" ]
 }
+
+@test "--apps with --update exits 2" {
+    run ./install.sh --apps --update
+    [ "$status" -eq 2 ]
+    [[ "$output" == *"--apps"* ]]
+}
+
+@test "--apps with --answers or --reconfigure exits 2" {
+    run ./install.sh --apps --reconfigure
+    [ "$status" -eq 2 ]
+    run ./install.sh --apps --answers /nonexistent
+    [ "$status" -eq 2 ]
+}
+
+@test "--apps without saved answers dies before preflight" {
+    stubs="$BATS_TEST_TMPDIR/stubs"
+    mkdir -p "$stubs"
+    export SUDO_ARGS="$BATS_TEST_TMPDIR/sudo-args"
+    : >"$SUDO_ARGS"
+    printf '#!/usr/bin/env bash\necho "$*" >>"$SUDO_ARGS"\n' >"$stubs/sudo"
+    chmod +x "$stubs/sudo"
+    XDG_CONFIG_HOME="$BATS_TEST_TMPDIR/cfg" PATH="$stubs:$PATH" run ./install.sh --apps --no-reboot
+    [ "$status" -ne 0 ]
+    [[ "$output" == *"--apps needs saved answers ($BATS_TEST_TMPDIR/cfg/nusku/answers)"* ]]
+    [[ "$output" == *"./install.sh"* ]]
+    [ ! -s "$SUDO_ARGS" ]
+}
+
+@test "help lists --apps" {
+    run ./install.sh --help
+    [[ "$output" == *"--apps"*"Change which optional apps and languages are installed, then re-apply."* ]]
+}
