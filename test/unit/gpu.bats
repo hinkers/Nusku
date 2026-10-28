@@ -60,6 +60,15 @@ in_sub() {
     [[ "$output" == *WLR_RENDERER_ALLOW_SOFTWARE* ]]
 }
 
+@test "gpu_hypr_conf vm pins monitor scale 1 (VMs report no physical size, auto picks 2)" {
+    run in_sub "gpu_hypr_conf vm microsoft"
+    [[ "$output" == *"monitor = , preferred, auto, 1"* ]]
+    run in_sub "gpu_hypr_conf vm kvm"
+    [[ "$output" == *"monitor = , preferred, auto, 1"* ]]
+    run in_sub "gpu_hypr_conf amd none"
+    [[ "$output" != *"monitor ="* ]]
+}
+
 @test "gpu_hypr_conf vm kvm has cursor fix but no software GL" {
     run in_sub "gpu_hypr_conf vm kvm"
     [[ "$output" == *no_hardware_cursors* ]]

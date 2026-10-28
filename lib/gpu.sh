@@ -106,6 +106,8 @@ gpu_hypr_conf() {
             echo "# Hybrid: Hyprland runs on the integrated GPU; use prime-run for apps."
             ;;
         vm)
+            # Virtual displays report a 0x0 mm size and Hyprland's auto scale then picks 2.
+            echo "monitor = , preferred, auto, 1"
             echo "cursor {"
             echo "    no_hardware_cursors = true"
             echo "}"
