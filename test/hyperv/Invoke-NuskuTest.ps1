@@ -346,9 +346,10 @@ else { Add-Result 'hyprland config errors' 'FAIL' "$cfgErrors" }
 $bindCount = ((Invoke-Remote ($envPreamble + "`nhyprctl binds -j | jq length")) | Select-Object -First 1)
 if ([int]("0$bindCount".Trim()) -ge 62) { Add-Result 'hyprland binds' 'PASS' "$bindCount binds" }
 else { Add-Result 'hyprland binds' 'FAIL' "$bindCount binds (expected >= 62)" }
-$notifyLua = 'local t = {} for _, n in ipairs(hl.notification.get()) do t[#t + 1] = n:get_text() end return table.concat(t, " / ")'
+$notifyLua = 'local t = {} for _, n in ipairs(hl.notification.get()) do t[#t + 1] = n:get_text() end return #t .. ": " .. table.concat(t, " / ")'
+# Prefix the count: an empty repl reply comes back from hyprctl as "unknown request".
 $notices = ((Invoke-Remote ($envPreamble + "`nhyprctl repl '$notifyLua'")) | Where-Object { $_.Trim() -ne '' }) -join ' / '
-if (-not $notices) { Add-Result 'hyprland notifications' 'PASS' 'none' }
+if ($notices.Trim() -eq '0:') { Add-Result 'hyprland notifications' 'PASS' 'none' }
 elseif ($notices -match '\.conf|0\.57') { Add-Result 'hyprland notifications' 'FAIL' "$notices" }
 else { Add-Result 'hyprland notifications' 'WARN' "$notices" }
 
