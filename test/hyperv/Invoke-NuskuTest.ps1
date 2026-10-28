@@ -11,7 +11,7 @@
     4. Run install.sh non-interactively with test/answers/vm.answers.
     5. Reboot, wait for SDDM autologin to start Hyprland and Waybar.
     6. Check services and processes, print a PASS/WARN/FAIL table.
-    7. Screenshot the desktop and the rofi launcher with grim.
+    7. Screenshot the desktop, a kitty window and the rofi launcher with grim.
     On error the VM is left running for debugging.
     Results go to test/screenshots/<timestamp>/ (gitignored).
     Exit code is 1 if the install or any check failed, else 0.
@@ -359,6 +359,11 @@ Write-Step 'Taking screenshots'
 $null = Invoke-Remote ($envPreamble + "`nhyprctl dismissnotify >/dev/null; hyprctl dispatch movecursor 512 400 >/dev/null")
 Start-Sleep -Seconds 1
 Save-Screenshot 'desktop.png'
+# A terminal shows the active window border (accent) and the Waybar window title.
+$null = Invoke-Remote ($envPreamble + "`nhyprctl dispatch exec kitty >/dev/null")
+Start-Sleep -Seconds 5
+$null = Invoke-Remote ($envPreamble + "`nhyprctl dispatch movecursor 512 400 >/dev/null")
+Save-Screenshot 'window.png'
 $null = Invoke-Remote ($envPreamble + "`nhyprctl dispatch exec 'rofi -show drun'")
 Start-Sleep -Seconds 4   # software rendering: give rofi time to map and animate in
 Save-Screenshot 'rofi.png'
