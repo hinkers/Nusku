@@ -72,5 +72,5 @@ in_sub() {
 
 @test "no legacy 'hyprctl dispatch <name>' calls (Lua configs need hl.dsp expressions)" {
     run grep -rnE "hyprctl dispatch +[a-z]" config scripts test/hyperv
-    [ "$status" -ne 0 ]
+    [ "$status" -eq 1 ]
 }

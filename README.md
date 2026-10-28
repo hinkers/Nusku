@@ -41,7 +41,9 @@ hl.config({ input = { kb_layout = "us,de", kb_options = "grp:alt_shift_toggle" }
 hl.bind("SUPER + B", hl.dsp.exec_cmd("firefox"))
 ```
 
-Upgrading from an older Nusku that used `local.conf`: that file is kept but no longer read. The installer warns if it holds settings; move them into `local.lua` in the syntax above.
+Upgrading from an older Nusku that used `local.conf`: that file is kept but no longer read. The installer warns if it holds settings; move them into `local.lua` in the syntax above. Log out and back in (or reboot) after updating: the running session still uses the old config.
+
+With a Lua config, `hyprctl dispatch` takes `hl.dsp.*` expressions (e.g. `hyprctl dispatch 'hl.dsp.exit()'`), so personal scripts using the old form (`hyprctl dispatch exit`) need updating.
 
 ## Keybinds
 

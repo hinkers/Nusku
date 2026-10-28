@@ -59,7 +59,7 @@ in_sub() {
     [ "$n_out" = "$n_tmpl" ]
     grep -q '94e2d5' "$XDG_CONFIG_HOME/nusku/theme/colors.css"
     run grep -r '{{' "$XDG_CONFIG_HOME/nusku/theme"
-    [ "$status" -ne 0 ]
+    [ "$status" -eq 1 ]
 }
 
 make_repo() {
@@ -155,11 +155,11 @@ make_repo() {
     kv="$HOME/.config/Kvantum"
     grep -qx 'theme=catppuccin-mocha-nusku' "$kv/kvantum.kvconfig"
     run grep -rn '^#' "$kv" --include='*.kvconfig'
-    [ "$status" -ne 0 ]
+    [ "$status" -eq 1 ]
     [ -s "$kv/catppuccin-mocha-nusku/catppuccin-mocha-nusku.kvconfig" ]
     grep -qi 'cba6f7' "$kv/catppuccin-mocha-nusku/catppuccin-mocha-nusku.svg"
     run grep -qi '89b4fa' "$kv/catppuccin-mocha-nusku/catppuccin-mocha-nusku.svg"
-    [ "$status" -ne 0 ]
+    [ "$status" -eq 1 ]
     grep -qi 'highlight.color=#cba6f7' "$kv/catppuccin-mocha-nusku/catppuccin-mocha-nusku.kvconfig"
     grep -qx '    theme = "catppuccin-mocha-mauve-cursors",' "$XDG_CONFIG_HOME/nusku/theme/hypr-cursor.lua"
     grep -q 'gtk-cursor-theme-name=catppuccin-mocha-mauve-cursors' "$HOME/.config/gtk-3.0/settings.ini"
@@ -193,5 +193,24 @@ make_repo() {
 
 @test "config/hypr has no hard-coded colours" {
     run grep -rnEi '(rgba?\(|0x)[0-9a-f]{6}|#[0-9a-f]{6}' config/hypr --include='*.lua'
-    [ "$status" -ne 0 ]
+    [ "$status" -eq 1 ]
+}
+
+@test "every colors.<name> / cursor.<name> used in config/hypr is defined by its template" {
+    local mod tmpl name keys refs n=0
+    for mod in colors cursor; do
+        tmpl="theme/templates/hypr-$mod.lua.tmpl"
+        keys="$(sed -nE 's/^    ([a-z0-9_]+) = .*/\1/p' "$tmpl")"
+        [ -n "$keys" ]
+        # Not preceded by '-' or a word char, so "hypr-colors.lua" in comments is skipped.
+        refs="$(grep -ohE "(^|[^-[:alnum:]_])$mod\.[a-z0-9_]+" config/hypr/*.lua | sed -E "s/.*$mod\.//" | sort -u)"
+        for name in $refs; do
+            n=$((n + 1))
+            grep -qx "$name" <<<"$keys" || {
+                echo "config/hypr uses $mod.$name, not defined in $tmpl"
+                return 1
+            }
+        done
+    done
+    [ "$n" -ge 5 ]
 }
