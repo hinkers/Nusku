@@ -1,0 +1,23 @@
+#!/usr/bin/env bash
+# nusku-menu-power: rofi power menu (Lock, Logout, Suspend, Reboot, Shutdown).
+set -euo pipefail
+
+menu() { rofi -dmenu -i -p "$1" -theme nusku "${@:2}"; }
+
+confirm() {
+    local ans
+    ans="$(printf 'No\nYes\n' | menu "$1?" -theme-str 'listview { lines: 2; }')" || return 1
+    [ "$ans" = "Yes" ]
+}
+
+choice="$(printf 'Lock\nLogout\nSuspend\nReboot\nShutdown\n' | menu "Power" -theme-str 'listview { lines: 5; }')" || exit 0
+
+case "$choice" in
+    Lock) hyprlock ;;
+    Logout) hyprctl dispatch exit ;;
+    Suspend) systemctl suspend ;;
+    Reboot) confirm "Reboot" && systemctl reboot ;;
+    Shutdown) confirm "Shutdown" && systemctl poweroff ;;
+    *) ;;
+esac
+exit 0

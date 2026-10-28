@@ -1,0 +1,4 @@
+# Nusku - login shell: put ~/.local/bin (nusku-* scripts) on PATH.
+typeset -U path
+path=("$HOME/.local/bin" $path)
+export PATH

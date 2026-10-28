@@ -1,0 +1,53 @@
+#!/usr/bin/env bash
+# nusku-theme ACCENT: switch the accent colour, re-render theme files, reload running apps.
+set -euo pipefail
+
+self="$(readlink -f "${BASH_SOURCE[0]}")"
+root="$(cd "$(dirname "$self")/.." && pwd)"
+
+# shellcheck source=lib/log.sh
+source "$root/lib/log.sh"
+# shellcheck source=lib/answers.sh
+source "$root/lib/answers.sh"
+# shellcheck source=lib/backup.sh
+source "$root/lib/backup.sh"
+# shellcheck source=lib/theme.sh
+source "$root/lib/theme.sh"
+
+accent="${1:-}"
+if [ -z "$accent" ]; then
+    printf 'Usage: nusku-theme ACCENT\nAccents: %s\n' "${NUSKU_ACCENTS[*]}" >&2
+    exit 2
+fi
+
+valid=0
+for a in "${NUSKU_ACCENTS[@]}"; do
+    [ "$a" = "$accent" ] && valid=1
+done
+if [ "$valid" -ne 1 ]; then
+    printf 'nusku-theme: unknown accent "%s"\nAccents: %s\n' "$accent" "${NUSKU_ACCENTS[*]}" >&2
+    exit 2
+fi
+
+log_init
+
+answers_file="${XDG_CONFIG_HOME:-$HOME/.config}/nusku/answers"
+if [ -r "$answers_file" ]; then
+    answers_load "$answers_file"
+fi
+answers_set ACCENT "$accent"
+answers_save "$answers_file"
+theme_render_all "$root"
+
+# Reloads: each is skipped silently when the app is not installed or running.
+if command -v hyprctl >/dev/null 2>&1 && [ -n "${HYPRLAND_INSTANCE_SIGNATURE:-}" ]; then
+    hyprctl reload >/dev/null 2>&1 || true
+fi
+if command -v pkill >/dev/null 2>&1; then
+    pkill -SIGUSR2 -x waybar >/dev/null 2>&1 || true
+fi
+if command -v swaync-client >/dev/null 2>&1 && command -v pgrep >/dev/null 2>&1 && pgrep -x swaync >/dev/null 2>&1; then
+    swaync-client -rs >/dev/null 2>&1 || true
+fi
+printf 'Accent set to %s\n' "$accent"
+printf 'The login screen and the GTK cursor follow the new accent after nusku-update (or ./install.sh --update).\n'

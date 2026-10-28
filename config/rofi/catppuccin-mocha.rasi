@@ -1,0 +1,39 @@
+/*
+ * Catppuccin Mocha for rofi
+ * MIT License, Copyright (c) 2021 Catppuccin
+ * Permission is hereby granted, free of charge, to any person obtaining a copy of this
+ * software and associated documentation files, to deal in the software without restriction,
+ * subject to the above copyright notice and this permission notice being included in all
+ * copies or substantial portions of the software. THE SOFTWARE IS PROVIDED "AS IS", WITHOUT
+ * WARRANTY OF ANY KIND. Full text: https://github.com/catppuccin/rofi/blob/71fb15577ccb091df2f4fc1f65710edbc61b5a53/LICENSE
+ */
+/* source: https://github.com/catppuccin/rofi/blob/main/themes/catppuccin-mocha.rasi@71fb15577ccb091df2f4fc1f65710edbc61b5a53 */
+* {
+  rosewater: #f5e0dc;
+  flamingo: #f2cdcd;
+  pink: #f5c2e7;
+  mauve: #cba6f7;
+  red: #f38ba8;
+  maroon: #eba0ac;
+  peach: #fab387;
+  yellow: #f9e2af;
+  green: #a6e3a1;
+  teal: #94e2d5;
+  sky: #89dceb;
+  sapphire: #74c7ec;
+  blue: #89b4fa;
+  lavender: #b4befe;
+  text: #cdd6f4;
+  subtext1: #bac2de;
+  subtext0: #a6adc8;
+  overlay2: #9399b2;
+  overlay1: #7f849c;
+  overlay0: #6c7086;
+  surface2: #585b70;
+  surface1: #45475a;
+  surface0: #313244;
+  base: #1e1e2e;
+  mantle: #181825;
+  crust: #11111b;
+}
+

@@ -1,0 +1,6 @@
+# NVIDIA open kernel modules: RTX 20xx / GTX 16xx (Turing) and newer.
+# Kernel headers for DKMS are added for each installed kernel (gpu_kernel_headers).
+nvidia-open-dkms
+nvidia-utils
+egl-wayland
+libva-nvidia-driver

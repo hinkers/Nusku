@@ -1,0 +1,22 @@
+#!/usr/bin/env bash
+# nusku-menu-wallpaper: pick a wallpaper (with thumbnails), then the monitor to apply it to.
+set -euo pipefail
+
+self="$(readlink -f "${BASH_SOURCE[0]}")"
+root="$(cd "$(dirname "$self")/.." && pwd)"
+
+rows=""
+while IFS= read -r f; do
+    rows+="$(basename "$f")\0icon\x1f$f\n"
+done < <("$root/scripts/nusku-wallpaper" list)
+
+name="$(printf '%b' "$rows" | rofi -dmenu -i -show-icons -p "Wallpaper" -theme nusku -theme-str 'element-icon { size: 6em; }')" || exit 0
+[ -n "$name" ] || exit 0
+file="$root/wallpapers/$name"
+
+monitors="$(hyprctl monitors -j | jq -r '.[].name')"
+target="$(printf 'All monitors\n%s\n' "$monitors" | rofi -dmenu -i -p "Apply to" -theme nusku)" || exit 0
+[ -n "$target" ] || exit 0
+[ "$target" = "All monitors" ] && target=all
+
+exec "$root/scripts/nusku-wallpaper" set "$file" "$target"

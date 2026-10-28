@@ -1,0 +1,4 @@
+# Shared bits for the legacy proprietary driver (GTX 10xx / Pascal and older); the driver itself is in gpu-nvidia.aur.
+# Kernel headers for DKMS are added for each installed kernel (gpu_kernel_headers).
+egl-wayland
+libva-nvidia-driver

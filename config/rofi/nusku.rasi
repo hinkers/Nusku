@@ -1,0 +1,43 @@
+/* Nusku rofi theme: Catppuccin Mocha with the Nusku accent. */
+@import "catppuccin-mocha"
+@import "~/.config/nusku/theme/colors"
+
+* {
+    font: "JetBrainsMono Nerd Font 12";
+    background-color: transparent;
+    text-color: @text;
+}
+
+window {
+    width: 40em;
+    background-color: @base;
+    border: 2px;
+    border-color: @accent;
+    border-radius: 12px;
+}
+
+mainbox { padding: 12px; children: [inputbar, listview]; spacing: 8px; }
+
+inputbar {
+    padding: 8px 12px;
+    background-color: @surface0;
+    border-radius: 8px;
+    children: [prompt, entry];
+    spacing: 8px;
+}
+prompt { text-color: @accent; }
+entry { placeholder: "Search"; placeholder-color: @overlay0; }
+
+listview { lines: 8; scrollbar: false; spacing: 4px; }
+
+element { padding: 8px 12px; border-radius: 8px; spacing: 10px; }
+element normal.normal, element alternate.normal { background-color: transparent; text-color: @text; }
+element selected.normal, element selected.active {
+    background-color: @accent;
+    text-color: @crust;
+}
+element normal.active, element alternate.active { text-color: @accent; }
+/* The * rule above gives every widget @text; let the row's colour (crust when selected) through. */
+element-text, element-icon { text-color: inherit; }
+element-text { vertical-align: 0.5; }
+element-icon { size: 1.5em; }
