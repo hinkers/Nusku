@@ -1,3 +1,5 @@
+bats_require_minimum_version 1.5.0
+
 # bats' own `run` clashes with Nusku's, so Nusku code runs via bash -c.
 
 setup() {
@@ -9,6 +11,7 @@ setup() {
     cat >"$STUBS/sudo" <<'STUB'
 #!/usr/bin/env bash
 printf '%s\n' "$*" >>"$SUDO_ARGS"
+[ "$1" = "-n" ] && exit "${STUB_SUDO_N_RC:-${STUB_SUDO_RC:-0}}"
 exit "${STUB_SUDO_RC:-0}"
 STUB
     cat >"$STUBS/curl" <<'STUB'
@@ -47,6 +50,20 @@ in_sub() {
     [[ "$output" == *"needs sudo access"* ]]
 }
 
+@test "passwordless sudo passes without sudo -v (verifypw needs NOPASSWD on every rule)" {
+    export STUB_SUDO_N_RC=0 STUB_SUDO_RC=1
+    run in_sub preflight_checks
+    [ "$status" -eq 0 ]
+    run ! grep -qx -- '-v' "$SUDO_ARGS"
+}
+
+@test "falls back to sudo -v when sudo needs a password" {
+    export STUB_SUDO_N_RC=1
+    run in_sub preflight_checks
+    [ "$status" -eq 0 ]
+    grep -qx -- '-v' "$SUDO_ARGS"
+}
+
 @test "fails with no network" {
     export STUB_CURL_RC=6
     run in_sub preflight_checks
@@ -57,7 +74,7 @@ in_sub() {
 @test "passes when all ok" {
     run in_sub preflight_checks
     [ "$status" -eq 0 ]
-    grep -qx -- '-v' "$SUDO_ARGS"
+    grep -qx -- '-n true' "$SUDO_ARGS"
 }
 
 @test "preflight_bootstrap runs a single full-upgrade pacman install" {

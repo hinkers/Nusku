@@ -11,7 +11,9 @@ preflight_checks() {
     [ "${NUSKU_EUID:-$EUID}" -ne 0 ] ||
         die "Run install.sh as your normal user, not root (it uses sudo when needed)."
 
-    sudo -v ||
+    # Try passwordless sudo first: `sudo -v` asks for a password unless every
+    # sudoers rule for the user is NOPASSWD (verifypw=all), e.g. wheel + a NOPASSWD rule.
+    sudo -n true 2>/dev/null || sudo -v ||
         die "Nusku needs sudo access. Make sure your user can use sudo (is in the wheel group) and you typed the password correctly."
 
     curl -fsS --max-time 10 https://archlinux.org >/dev/null ||
