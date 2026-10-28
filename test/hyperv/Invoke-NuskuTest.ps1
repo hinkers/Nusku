@@ -283,6 +283,15 @@ while ($hyprUp -and (Get-Date) -lt $deadline) {
 }
 Start-Sleep -Seconds 3   # let it draw
 
+# Shared preamble: find the Wayland socket and Hyprland instance signature so
+# grim and hyprctl work from an SSH session.
+$envPreamble = @'
+export XDG_RUNTIME_DIR=/run/user/$(id -u)
+export WAYLAND_DISPLAY=$(ls "$XDG_RUNTIME_DIR"/wayland-* 2>/dev/null | grep -v '\.lock$' | head -1 | xargs -r basename)
+sig=$(ls -t "$XDG_RUNTIME_DIR/hypr/" 2>/dev/null | head -1)
+export HYPRLAND_INSTANCE_SIGNATURE="$sig"
+'@
+
 # --------------------------------------------------------------- 6. checks
 Write-Step 'Checking services and processes'
 $results = New-Object System.Collections.Generic.List[object]
@@ -325,19 +334,28 @@ if ($script:RemoteExit -eq 0) {
     }
 }
 
+# The config is Lua (hyprctl eval only works with a Lua config), loads without
+# errors, registers every Nusku bind, and Hyprland shows no notice (e.g. the
+# 0.56 ".conf format will be removed" one) over the desktop.
+$cfgType = ((Invoke-Remote ($envPreamble + "`nhyprctl eval 'return 1'")) -join ' ').Trim()
+if ($cfgType -eq 'ok') { Add-Result 'hyprland config is lua' 'PASS' 'hyprctl eval ok' }
+else { Add-Result 'hyprland config is lua' 'FAIL' "hyprctl eval: $cfgType" }
+$cfgErrors = ((Invoke-Remote ($envPreamble + "`nhyprctl configerrors")) | Where-Object { $_.Trim() -ne '' }) -join ' / '
+if ($script:RemoteExit -eq 0 -and -not $cfgErrors) { Add-Result 'hyprland config errors' 'PASS' 'none' }
+else { Add-Result 'hyprland config errors' 'FAIL' "$cfgErrors" }
+$bindCount = ((Invoke-Remote ($envPreamble + "`nhyprctl binds -j | jq length")) | Select-Object -First 1)
+if ([int]("0$bindCount".Trim()) -ge 62) { Add-Result 'hyprland binds' 'PASS' "$bindCount binds" }
+else { Add-Result 'hyprland binds' 'FAIL' "$bindCount binds (expected >= 62)" }
+$notifyLua = 'local t = {} for _, n in ipairs(hl.notification.get()) do t[#t + 1] = n:get_text() end return table.concat(t, " / ")'
+$notices = ((Invoke-Remote ($envPreamble + "`nhyprctl repl '$notifyLua'")) | Where-Object { $_.Trim() -ne '' }) -join ' / '
+if (-not $notices) { Add-Result 'hyprland notifications' 'PASS' 'none' }
+elseif ($notices -match '\.conf|0\.57') { Add-Result 'hyprland notifications' 'FAIL' "$notices" }
+else { Add-Result 'hyprland notifications' 'WARN' "$notices" }
+
 $results | Format-Table -AutoSize | Out-String | Write-Host
 $checksFailed = @($results | Where-Object { $_.Result -eq 'FAIL' }).Count -gt 0
 
 # ------------------------------------------------------------ 7. screenshots
-# Shared preamble: find the Wayland socket and Hyprland instance signature so
-# grim and hyprctl work from an SSH session.
-$envPreamble = @'
-export XDG_RUNTIME_DIR=/run/user/$(id -u)
-export WAYLAND_DISPLAY=$(ls "$XDG_RUNTIME_DIR"/wayland-* 2>/dev/null | grep -v '\.lock$' | head -1 | xargs -r basename)
-sig=$(ls -t "$XDG_RUNTIME_DIR/hypr/" 2>/dev/null | head -1)
-export HYPRLAND_INSTANCE_SIGNATURE="$sig"
-'@
-
 function Save-Screenshot([string]$File) {
     $null = Invoke-Remote ($envPreamble + "`ngrim /tmp/shot.png")
     if ($script:RemoteExit -ne 0) {
@@ -354,17 +372,18 @@ function Save-Screenshot([string]$File) {
 $script:shotFailed = $false
 
 Write-Step 'Taking screenshots'
-# Hyprland 0.56 shows a timed ".conf format is deprecated" notice at login; clear
-# it so it does not cover the bar, and park the cursor off the bar (no tooltips).
-$null = Invoke-Remote ($envPreamble + "`nhyprctl dismissnotify >/dev/null; hyprctl dispatch movecursor 512 400 >/dev/null")
+# Hyprland's config is Lua, so 'hyprctl dispatch' takes hl.dsp expressions.
+# Park the cursor off the bar (no tooltips).
+$moveCursor = "`nhyprctl dispatch 'hl.dsp.cursor.move({ x = 512, y = 400 })' >/dev/null"
+$null = Invoke-Remote ($envPreamble + $moveCursor)
 Start-Sleep -Seconds 1
 Save-Screenshot 'desktop.png'
 # A terminal shows the active window border (accent) and the Waybar window title.
-$null = Invoke-Remote ($envPreamble + "`nhyprctl dispatch exec kitty >/dev/null")
+$null = Invoke-Remote ($envPreamble + "`nhyprctl dispatch 'hl.dsp.exec_cmd(`"kitty`")' >/dev/null")
 Start-Sleep -Seconds 5
-$null = Invoke-Remote ($envPreamble + "`nhyprctl dispatch movecursor 512 400 >/dev/null")
+$null = Invoke-Remote ($envPreamble + $moveCursor)
 Save-Screenshot 'window.png'
-$null = Invoke-Remote ($envPreamble + "`nhyprctl dispatch exec 'rofi -show drun'")
+$null = Invoke-Remote ($envPreamble + "`nhyprctl dispatch 'hl.dsp.exec_cmd(`"rofi -show drun`")' >/dev/null")
 Start-Sleep -Seconds 4   # software rendering: give rofi time to map and animate in
 Save-Screenshot 'rofi.png'
 $null = Invoke-Remote 'pkill -x -u "$(id -u)" rofi || true'

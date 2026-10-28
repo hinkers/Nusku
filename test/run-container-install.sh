@@ -51,10 +51,27 @@ echo "=== update run (saved answers) ==="
 rm -rf "$HOME/.config/btop" && ln -s /nusku/config/btop "$HOME/.config/btop"
 # Simulate a moved repo: the saved wallpaper path no longer exists.
 printf "*=/nonexistent/old-repo/wallpapers/space.png\n" >"$state/wallpapers"
-if ./install.sh --update --no-reboot; then
+# Simulate a Stage 1 (hyprlang) install: generated .conf files and a local.conf with overrides.
+cfg="$HOME/.config/nusku"
+printf "env = OLD,1\n" >"$cfg/gpu.conf"
+printf "\$accent = rgb(000000)\n" >"$cfg/theme/hypr-colors.conf"
+printf "env = XCURSOR_THEME,old\n" >"$cfg/theme/hypr-cursor.conf"
+printf "# mine\nmonitor = DP-1, 2560x1440@144, 0x0, 1\n" >"$cfg/local.conf"
+./install.sh --update --no-reboot 2>&1 | tee /tmp/update.log
+if [ "${PIPESTATUS[0]}" -eq 0 ]; then
     pass "install.sh --update exited 0"
 else
     bad "install.sh --update exited non-zero"
+fi
+if [ ! -e "$cfg/gpu.conf" ] && [ ! -e "$cfg/theme/hypr-colors.conf" ] && [ ! -e "$cfg/theme/hypr-cursor.conf" ]; then
+    pass "--update removed the old generated hyprlang files"
+else
+    bad "old generated hyprlang files left: $(ls "$cfg" "$cfg/theme")"
+fi
+if grep -q "DP-1" "$cfg/local.conf" && [ "$(grep -c "local.conf is no longer read" /tmp/update.log)" -eq 1 ]; then
+    pass "--update kept local.conf and warned once to move it to local.lua"
+else
+    bad "local.conf migration: $(grep -c "local.conf is no longer read" /tmp/update.log) warnings, file: $(cat "$cfg/local.conf" 2>&1)"
 fi
 [ "$(backups)" = "$before" ] || bad "--update run created a backup dir"
 if grep -qx "\*=/nusku/wallpapers/space.png" "$state/wallpapers" && [ -f "$(readlink "$state/current-wallpaper")" ]; then
@@ -104,7 +121,7 @@ else
     bad "pacman -Q hyprland waybar sddm failed"
 fi
 
-for f in "$HOME/.config/nusku/local.conf" "$HOME/.config/nusku/gpu.conf"     "$HOME/.config/nusku/answers" "$state/wallpapers" /var/lib/nusku/sddm-background/background; do
+for f in "$HOME/.config/nusku/local.lua" "$HOME/.config/nusku/gpu.lua" "$HOME/.config/nusku/theme/hypr-colors.lua" "$HOME/.config/nusku/theme/hypr-cursor.lua"     "$HOME/.config/nusku/answers" "$state/wallpapers" /var/lib/nusku/sddm-background/background; do
     if [ -e "$f" ]; then pass "$f exists"; else bad "$f missing"; fi
 done
 
@@ -117,16 +134,26 @@ fi
 # Hyprland refuses to start (even for --help) without XDG_RUNTIME_DIR.
 export XDG_RUNTIME_DIR="${XDG_RUNTIME_DIR:-/tmp/xdg-runtime-$(id -u)}"
 mkdir -p "$XDG_RUNTIME_DIR" && chmod 700 "$XDG_RUNTIME_DIR"
-if Hyprland --help 2>&1 | grep -q -- --verify-config; then
-    out="$(Hyprland --verify-config -c "$HOME/.config/hypr/hyprland.conf" 2>&1)"
-    if printf "%s\n" "$out" | grep -qi "config ok"; then
-        pass "Hyprland --verify-config"
-    else
-        printf "%s\n" "$out" | tail -n 30
-        bad "Hyprland --verify-config"
-    fi
+if [ ! -e "$HOME/.config/hypr/hyprland.conf" ] && [ -f "$HOME/.config/hypr/hyprland.lua" ]; then
+    pass "~/.config/hypr has hyprland.lua and no hyprland.conf"
 else
-    echo "SKIP: Hyprland --verify-config not supported"
+    bad "~/.config/hypr: $(ls "$HOME/.config/hypr")"
+fi
+# No -c: Hyprland picks the config itself, so this also proves it chooses the Lua one.
+out="$(Hyprland --verify-config 2>&1)"
+rc=$?
+printf "%s\n" "$out" | grep -v DEBUG
+if [ "$rc" -eq 0 ] && printf "%s\n" "$out" | grep -q "^config ok" &&
+    printf "%s\n" "$out" | grep -q "Using lua config found at $HOME/.config/hypr/hyprland.lua"; then
+    pass "Hyprland --verify-config: Lua config ok"
+else
+    printf "%s\n" "$out" | tail -n 30
+    bad "Hyprland --verify-config (exit $rc)"
+fi
+if printf "%s\n" "$out" | grep -Eqi "legacy config|deprecat|will be removed|0\.57"; then
+    bad "Hyprland reports the legacy/deprecated config format"
+else
+    pass "no legacy-config or deprecation message"
 fi
 
 if [ "$fail" -eq 0 ]; then
