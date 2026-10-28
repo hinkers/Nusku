@@ -276,3 +276,25 @@ ask() {
     [[ "$output" != *"No optional apps"* ]]
     [[ "$output" == *"APPS=[gimp] LANGS=[]"* ]]
 }
+
+@test "ticking None clears the group" {
+    fake_gum 'Media (2/4)' $'None\n★ VLC' Done
+    run ask ':'
+    [ "$status" -eq 0 ]
+    [ "${lines[0]}" = "APPS=neovim gh claude-code firefox discord obsidian" ]
+    grep -qxF None "$GUM_DIR/call-2"
+}
+
+@test "ticking None clears the languages" {
+    fake_gum 'Dev (3/6)' ESC None Done
+    run ask 'answers_set LANGS "python rust"'
+    [ "$status" -eq 0 ]
+    [ "${lines[1]}" = "LANGS=" ]
+}
+
+@test "empty confirm clears the group" {
+    fake_gum 'Media (2/4)' '' Done
+    run ask ':'
+    [ "$status" -eq 0 ]
+    [ "${lines[0]}" = "APPS=neovim gh claude-code firefox discord obsidian" ]
+}

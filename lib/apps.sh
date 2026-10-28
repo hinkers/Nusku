@@ -105,7 +105,8 @@ _apps_count() {
     printf '%s/%s' "$n" "$t"
 }
 
-# _apps_pick_group GROUP: checklist over one group; Esc or an empty reply changes nothing.
+# _apps_pick_group GROUP: checklist over one group. Esc changes nothing; an empty reply or a
+# ticked "None" clears the group.
 _apps_pick_group() {
     local g="$1" id line out pre="" sel=" "
     local -a ids=() lines=()
@@ -115,20 +116,25 @@ _apps_pick_group() {
         case "$_APPS_SEL" in *" $id "*) pre="${pre:+$pre,}${lines[-1]}" ;; esac
     done
     out="$(gum choose --no-limit --header "$(apps_group_label "$g") — space toggles, ctrl+a selects all, enter confirms" \
-        --selected "$pre" "${lines[@]}")" || return 0
-    [ -n "$out" ] || return 0
+        --selected "$pre" None "${lines[@]}")" || return 0
     while IFS= read -r line; do
         for id in "${ids[@]}"; do
             [ "$(_apps_pick_label "$id")" = "$line" ] && sel="$sel$id "
         done
     done <<<"$out"
+    case $'
+'"$out"$'
+' in *$'
+None
+'*) sel=" " ;; esac
     for id in "${ids[@]}"; do
         _APPS_SEL="${_APPS_SEL// $id / }"
     done
     _APPS_SEL="$_APPS_SEL${sel# }"
 }
 
-# _apps_pick_langs: checklist over the languages; Esc or an empty reply changes nothing.
+# _apps_pick_langs: checklist over the languages. Esc changes nothing; an empty reply or a
+# ticked "None" clears them.
 _apps_pick_langs() {
     local id line out pre="" sel=" "
     local -a ids=() labels=()
@@ -138,13 +144,17 @@ _apps_pick_langs() {
         case "$_APPS_LANGS" in *" $id "*) pre="${pre:+$pre,}${labels[-1]}" ;; esac
     done
     out="$(gum choose --no-limit --header "Languages — runtimes, tools and Neovim support" \
-        --selected "$pre" "${labels[@]}")" || return 0
-    [ -n "$out" ] || return 0
+        --selected "$pre" None "${labels[@]}")" || return 0
     while IFS= read -r line; do
         for id in "${ids[@]}"; do
             [ "$(apps_label "$id")" = "$line" ] && sel="$sel$id "
         done
     done <<<"$out"
+    case $'
+'"$out"$'
+' in *$'
+None
+'*) sel=" " ;; esac
     _APPS_LANGS="$sel"
 }
 
