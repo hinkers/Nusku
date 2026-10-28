@@ -359,3 +359,110 @@ apps_summary_failures() {
     done
     printf '%sFix the cause and run ./install.sh --update to retry.%s\n' "$red" "$off"
 }
+
+# --- Setup hooks ----------------------------------------------------------------------
+# Plain sentences for the summary (added by hooks, shown under "Notes:").
+NUSKU_APP_NOTES=()
+
+# apps_summary_notes: the "Notes" block for the summary; nothing when there are none.
+apps_summary_notes() {
+    [ "${#NUSKU_APP_NOTES[@]}" -gt 0 ] || return 0
+    local n
+    printf '\nNotes:\n'
+    for n in "${NUSKU_APP_NOTES[@]}"; do
+        printf '  - %s\n' "$n"
+    done
+}
+
+# _apps_user_in_group USER GROUP: status 0 when USER is a member of GROUP.
+_apps_user_in_group() {
+    local g
+    for g in $(id -nG "$1"); do
+        [ "$g" != "$2" ] || return 0
+    done
+    return 1
+}
+
+# _apps_join_group GROUP: add the current user to GROUP unless already in it.
+_apps_join_group() {
+    local user="${USER:-$(id -un)}"
+    if _apps_user_in_group "$user" "$1"; then
+        log_info "$user is already in the $1 group"
+        return 0
+    fi
+    run_soft sudo usermod -aG "$1" "$user"
+}
+
+apps_hook_docker() {
+    run_soft sudo systemctl enable docker.service || return 1
+    _apps_join_group docker || return 1
+    NUSKU_APP_NOTES+=("You are in the docker group: that is root-equivalent. Log out and back in to use docker without sudo.")
+}
+
+apps_hook_ufw() {
+    run_soft sudo ufw default deny incoming || return 1
+    run_soft sudo ufw default allow outgoing || return 1
+    case " $(answers_get APPS) " in
+        *" localsend "*)
+            run_soft sudo ufw allow 53317/tcp comment LocalSend || return 1
+            run_soft sudo ufw allow 53317/udp comment LocalSend || return 1
+            ;;
+    esac
+    run_soft sudo ufw --force enable || return 1
+    run_soft sudo systemctl enable ufw.service
+}
+
+apps_hook_flatpak() {
+    pkg_flathub_remote
+}
+
+apps_hook_gamemode() {
+    _apps_join_group gamemode
+}
+
+apps_hook_snapper() {
+    apps_root_is_btrfs || return 0
+    if [ -e "${NUSKU_ETC:-/etc}/snapper/configs/root" ]; then
+        log_info "Snapper is already configured for /; skipping"
+        return 0
+    fi
+    if findmnt -n /.snapshots >/dev/null 2>&1; then
+        # archinstall mounts its own @snapshots there; snapper wants to create the subvolume itself.
+        run_soft sudo umount /.snapshots || return 1
+        run_soft sudo rmdir /.snapshots || return 1
+        run_soft sudo snapper -c root create-config / || return 1
+        run_soft sudo btrfs subvolume delete /.snapshots || return 1
+        run_soft sudo mkdir /.snapshots || return 1
+        run_soft sudo mount -a || return 1
+    else
+        run_soft sudo snapper -c root create-config / || return 1
+    fi
+    run_soft sudo systemctl enable snapper-timeline.timer snapper-cleanup.timer grub-btrfsd.service || return 1
+    if [ -e "${NUSKU_BOOT:-/boot}/grub/grub.cfg" ]; then
+        run_soft sudo grub-mkconfig -o /boot/grub/grub.cfg
+    fi
+}
+
+apps_hook_zathura() {
+    run_soft xdg-mime default org.pwmt.zathura.desktop application/pdf
+}
+
+apps_hook_rust() {
+    if ! rustup default 2>/dev/null | grep -q '(default)'; then
+        run_soft rustup default stable || return 1
+    fi
+    run_soft rustup component add rust-analyzer rustfmt
+}
+
+# apps_run_hooks: run apps_hook_<id> for each selected app (catalogue order), then each selected
+# language. A failing hook is recorded and the rest still run.
+apps_run_hooks() {
+    local id fn sel
+    sel=" $(_apps_selected | tr '\n' ' ') "
+    while IFS= read -r id; do
+        case "$sel" in *" $id "*) ;; *) continue ;; esac
+        fn="apps_hook_${id//-/_}"
+        declare -F "$fn" >/dev/null || continue
+        "$fn" || NUSKU_APP_FAILURES+=("$(apps_label "$id"): setup failed")
+    done < <(awk -F'|' '$1 == "app" { print $3 } $1 == "lang" { print $2 }' "$NUSKU_APPS_LIST")
+}

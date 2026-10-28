@@ -334,6 +334,11 @@ step_system() {
     system_configure
 }
 
+step_apps_setup() {
+    step "Apps setup"
+    apps_run_hooks
+}
+
 step_summary() {
     step "Summary"
     local gpu mod bdir
@@ -351,6 +356,7 @@ step_summary() {
             printf '  Backups: %s\n' "$bdir"
         fi
         apps_summary_failures
+        apps_summary_notes
         printf '\nNext step: Reboot to log in.\n'
     } | tee -a "$NUSKU_LOG" >&2
 }
@@ -377,6 +383,7 @@ main() {
     step_dotfiles
     step_local_files
     step_system
+    step_apps_setup
     step_summary
     step_reboot
 }

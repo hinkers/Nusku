@@ -413,3 +413,182 @@ ask() {
     [ "$status" -eq 0 ]
     [ -z "$output" ]
 }
+
+# --- Setup hooks ----------------------------------------------------------------------
+# sudo and the user-level tools log their calls to $CALLS; sudo fails when its arguments
+# contain $SUDO_FAIL.
+hook_stubs() {
+    STUBS="$BATS_TEST_TMPDIR/stubs"
+    CALLS="$BATS_TEST_TMPDIR/calls"
+    mkdir -p "$STUBS"
+    : >"$CALLS"
+    cat >"$STUBS/sudo" <<'STUB'
+#!/bin/sh
+echo "sudo $*" >>"$CALLS"
+case "$*" in *"${SUDO_FAIL:-@@none@@}"*) exit 1 ;; esac
+exit 0
+STUB
+    for t in xdg-mime rustup; do
+        printf '#!/bin/sh\necho "%s $*" >>"$CALLS"\n[ "$*" = "default" ] && printf "%%s" "${RUSTUP_DEFAULT:-}"\nexit 0\n' "$t" >"$STUBS/$t"
+    done
+    printf '#!/bin/sh\necho "id $*" >>"$CALLS"\necho "${ID_GROUPS:-wheel}"\n' >"$STUBS/id"
+    printf '#!/bin/sh\nexit "${FINDMNT_RC:-1}"\n' >"$STUBS/findmnt"
+    chmod +x "$STUBS"/*
+}
+
+in_hooks() {
+    NUSKU_ETC="$BATS_TEST_TMPDIR/etc" NUSKU_BOOT="$BATS_TEST_TMPDIR/boot" USER=tester \
+        PATH="$STUBS:$PATH" CALLS="$CALLS" in_sub "source lib/packages.sh; $1"
+}
+
+@test "hooks run only for selected apps" {
+    hook_stubs
+    run in_hooks "answers_set APPS docker; answers_set LANGS ''; apps_run_hooks"
+    [ "$status" -eq 0 ]
+    grep -q 'sudo systemctl enable docker.service' "$CALLS"
+    ! grep -q ufw "$CALLS" || false
+}
+
+@test "docker hook adds the user to the group and leaves a note" {
+    hook_stubs
+    run in_hooks "answers_set APPS docker; apps_run_hooks; apps_summary_notes"
+    [ "$status" -eq 0 ]
+    grep -q 'sudo usermod -aG docker tester' "$CALLS"
+    [[ "$output" == *"Notes:"* ]]
+    [[ "$output" == *"You are in the docker group: that is root-equivalent. Log out and back in to use docker without sudo."* ]]
+}
+
+@test "docker hook skips usermod when already in the group" {
+    hook_stubs
+    ID_GROUPS="wheel docker" run in_hooks "answers_set APPS docker; apps_run_hooks"
+    [ "$status" -eq 0 ]
+    grep -q 'sudo systemctl enable docker.service' "$CALLS"
+    ! grep -q usermod "$CALLS" || false
+}
+
+@test "summary prints no notes when there are none" {
+    run in_sub 'apps_summary_notes'
+    [ "$status" -eq 0 ]
+    [ -z "$output" ]
+}
+
+@test "ufw hook opens LocalSend's port when LocalSend is selected" {
+    hook_stubs
+    run in_hooks "answers_set APPS 'localsend ufw'; apps_run_hooks"
+    [ "$status" -eq 0 ]
+    grep -q 'sudo ufw allow 53317/tcp comment LocalSend' "$CALLS"
+    grep -q 'sudo ufw allow 53317/udp comment LocalSend' "$CALLS"
+}
+
+@test "ufw hook leaves the port closed without LocalSend" {
+    hook_stubs
+    run in_hooks "answers_set APPS ufw; apps_run_hooks"
+    [ "$status" -eq 0 ]
+    grep -q 'sudo ufw default deny incoming' "$CALLS"
+    grep -q 'sudo ufw default allow outgoing' "$CALLS"
+    ! grep -q 53317 "$CALLS" || false
+}
+
+@test "ufw hook uses --force enable and enables the service" {
+    hook_stubs
+    run in_hooks "answers_set APPS ufw; apps_run_hooks"
+    grep -q 'sudo ufw --force enable' "$CALLS"
+    grep -q 'sudo systemctl enable ufw.service' "$CALLS"
+}
+
+@test "flatpak hook adds the Flathub remote" {
+    hook_stubs
+    run in_hooks "answers_set APPS flatpak; apps_run_hooks"
+    grep -q 'sudo flatpak remote-add --if-not-exists --system flathub' "$CALLS"
+}
+
+@test "gamemode hook joins the group unless already a member" {
+    hook_stubs
+    run in_hooks "answers_set APPS gamemode; apps_run_hooks"
+    grep -q 'sudo usermod -aG gamemode tester' "$CALLS"
+    : >"$CALLS"
+    ID_GROUPS="wheel gamemode" run in_hooks "answers_set APPS gamemode; apps_run_hooks"
+    ! grep -q usermod "$CALLS" || false
+}
+
+@test "zathura hook makes it the PDF viewer, as the user" {
+    hook_stubs
+    run in_hooks "answers_set APPS zathura; apps_run_hooks"
+    grep -q '^xdg-mime default org.pwmt.zathura.desktop application/pdf' "$CALLS"
+    ! grep -q 'sudo xdg-mime' "$CALLS" || false
+}
+
+@test "snapper hook skips when the root config exists" {
+    hook_stubs
+    mkdir -p "$BATS_TEST_TMPDIR/etc/snapper/configs"
+    : >"$BATS_TEST_TMPDIR/etc/snapper/configs/root"
+    NUSKU_ROOT_FSTYPE=btrfs run in_hooks "answers_set APPS snapper; apps_run_hooks"
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"already"* ]]
+    [ ! -s "$CALLS" ]
+}
+
+@test "snapper hook does the umount dance when /.snapshots is mounted" {
+    hook_stubs
+    mkdir -p "$BATS_TEST_TMPDIR/boot/grub"
+    : >"$BATS_TEST_TMPDIR/boot/grub/grub.cfg"
+    FINDMNT_RC=0 NUSKU_ROOT_FSTYPE=btrfs run in_hooks "answers_set APPS snapper; apps_run_hooks"
+    [ "$status" -eq 0 ]
+    local want=(
+        'sudo umount /.snapshots'
+        'sudo rmdir /.snapshots'
+        'sudo snapper -c root create-config /'
+        'sudo btrfs subvolume delete /.snapshots'
+        'sudo mkdir /.snapshots'
+        'sudo mount -a'
+        'sudo systemctl enable snapper-timeline.timer snapper-cleanup.timer grub-btrfsd.service'
+        'sudo grub-mkconfig -o /boot/grub/grub.cfg'
+    )
+    mapfile -t got <"$CALLS"
+    [ "${got[*]}" = "${want[*]}" ] || { printf '%s\n' "${got[@]}"; false; }
+}
+
+@test "snapper hook only creates the config when /.snapshots is not mounted" {
+    hook_stubs
+    NUSKU_ROOT_FSTYPE=btrfs run in_hooks "answers_set APPS snapper; apps_run_hooks"
+    [ "$status" -eq 0 ]
+    grep -q 'sudo snapper -c root create-config /' "$CALLS"
+    ! grep -q umount "$CALLS" || false
+    ! grep -q grub-mkconfig "$CALLS" || false
+    grep -q 'sudo systemctl enable snapper-timeline.timer' "$CALLS"
+}
+
+@test "snapper hook does nothing on ext4" {
+    hook_stubs
+    NUSKU_ROOT_FSTYPE=ext4 run in_hooks "answers_set APPS snapper; apps_run_hooks"
+    [ "$status" -eq 0 ]
+    [ ! -s "$CALLS" ]
+}
+
+@test "a failing hook is recorded and later hooks still run" {
+    hook_stubs
+    SUDO_FAIL="enable docker.service" run in_hooks "answers_set APPS 'docker zathura'; apps_run_hooks; printf '%s\n' \"\${NUSKU_APP_FAILURES[@]}\""
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"Docker + Compose: setup failed"* ]]
+    grep -q 'xdg-mime default org.pwmt.zathura.desktop' "$CALLS"
+}
+
+@test "rust hook sets stable only when no default toolchain" {
+    hook_stubs
+    RUSTUP_DEFAULT="" run in_hooks "answers_set APPS ''; answers_set LANGS rust; apps_run_hooks"
+    [ "$status" -eq 0 ]
+    grep -q '^rustup default stable' "$CALLS"
+    grep -q '^rustup component add rust-analyzer rustfmt' "$CALLS"
+    : >"$CALLS"
+    RUSTUP_DEFAULT="stable-x86_64-unknown-linux-gnu (default)" run in_hooks "answers_set APPS ''; answers_set LANGS rust; apps_run_hooks"
+    ! grep -q '^rustup default stable' "$CALLS" || false
+    grep -q '^rustup component add rust-analyzer rustfmt' "$CALLS"
+}
+
+@test "hooks run apps in catalogue order, then languages" {
+    hook_stubs
+    run in_hooks "answers_set APPS 'ufw zathura docker'; answers_set LANGS rust; apps_run_hooks"
+    local order
+    order="$(grep -oE 'docker.service|zathura|ufw.service|rustup default stable' "$CALLS" | tr '\n' ',')"
+    [ "$order" = "docker.service,zathura,ufw.service,rustup default stable," ]
+}
