@@ -14,7 +14,7 @@ choice="$(printf 'Lock\nLogout\nSuspend\nReboot\nShutdown\n' | menu "Power" -the
 
 case "$choice" in
     Lock) hyprlock ;;
-    Logout) hyprctl dispatch exit ;;
+    Logout) hyprctl dispatch 'hl.dsp.exit()' ;;
     Suspend) systemctl suspend ;;
     Reboot) confirm "Reboot" && systemctl reboot ;;
     Shutdown) confirm "Shutdown" && systemctl poweroff ;;

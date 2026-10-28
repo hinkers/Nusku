@@ -161,8 +161,7 @@ make_repo() {
     run grep -qi '89b4fa' "$kv/catppuccin-mocha-nusku/catppuccin-mocha-nusku.svg"
     [ "$status" -ne 0 ]
     grep -qi 'highlight.color=#cba6f7' "$kv/catppuccin-mocha-nusku/catppuccin-mocha-nusku.kvconfig"
-    grep -q 'XCURSOR_THEME,catppuccin-mocha-mauve-cursors' "$XDG_CONFIG_HOME/nusku/theme/hypr-cursor.conf"
-    grep -q 'HYPRCURSOR_THEME,catppuccin-mocha-mauve-cursors' "$XDG_CONFIG_HOME/nusku/theme/hypr-cursor.conf"
+    grep -qx '    theme = "catppuccin-mocha-mauve-cursors",' "$XDG_CONFIG_HOME/nusku/theme/hypr-cursor.lua"
     grep -q 'gtk-cursor-theme-name=catppuccin-mocha-mauve-cursors' "$HOME/.config/gtk-3.0/settings.ini"
     grep -q 'gtk-theme-name=adw-gtk3-dark' "$HOME/.config/gtk-4.0/settings.ini"
 }
@@ -174,4 +173,25 @@ make_repo() {
     [[ "$output" == *"login screen"* ]]
     [[ "$output" == *"cursor"* ]]
     [[ "$output" == *"nusku-update"* ]]
+}
+
+@test "Hyprland colour and cursor modules are Lua tables from the palette" {
+    run in_sub "answers_set ACCENT peach; theme_render_all '$PWD'"
+    [ "$status" -eq 0 ]
+    t="$XDG_CONFIG_HOME/nusku/theme"
+    [ ! -e "$t/hypr-colors.conf" ]
+    [ ! -e "$t/hypr-cursor.conf" ]
+    grep -q '^return {' "$t/hypr-colors.lua"
+    grep -qx '    accent = "rgb(fab387)",' "$t/hypr-colors.lua"
+    grep -qx '    base = "rgb(1e1e2e)",' "$t/hypr-colors.lua"
+    grep -qx '    surface0 = "rgb(313244)",' "$t/hypr-colors.lua"
+    grep -qx '    crust = "rgb(11111b)",' "$t/hypr-colors.lua"
+    [ "$(grep -c ' = "rgb(' "$t/hypr-colors.lua")" -eq 27 ]
+    grep -q '^return {' "$t/hypr-cursor.lua"
+    grep -qx '    theme = "catppuccin-mocha-peach-cursors",' "$t/hypr-cursor.lua"
+}
+
+@test "config/hypr has no hard-coded colours" {
+    run grep -rnEi '(rgba?\(|0x)[0-9a-f]{6}|#[0-9a-f]{6}' config/hypr --include='*.lua'
+    [ "$status" -ne 0 ]
 }
