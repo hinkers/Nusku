@@ -1,0 +1,68 @@
+# Optional app and language catalogue. Parsed by lib/apps.sh, never sourced.
+#
+#   group|<id>|<label>
+#   app|<group>|<id>|<* or ->|<label>|<tokens, space-separated>|<flags, comma-separated or empty>
+#   lang|<id>|<label>|<tokens>|<flags>
+#
+# '*' marks the pre-selected favourites. Tokens: name (official repo), aur:name, flatpak:app.id.
+# Flags: multilib (needs the multilib repo), gpu32 (add the GPU's 32-bit Vulkan driver),
+# btrfs (only offered when / is btrfs). Labels contain no ',' or '|' (gum --selected is comma-separated).
+
+group|dev|Dev
+app|dev|neovim|*|Neovim (LazyVim)|neovim tree-sitter-cli wl-clipboard unzip lazygit fd ripgrep|
+app|dev|gh|*|GitHub CLI|github-cli|
+app|dev|claude-code|*|Claude Code|aur:claude-code|
+app|dev|lazygit|-|lazygit|lazygit|
+app|dev|docker|-|Docker + Compose|docker docker-compose docker-buildx|
+app|dev|vscode|-|VS Code|aur:visual-studio-code-bin|
+
+group|everyday|Everyday
+app|everyday|firefox|*|Firefox|firefox|
+app|everyday|discord|*|Discord|discord|
+app|everyday|obsidian|*|Obsidian|obsidian|
+app|everyday|libreoffice|-|LibreOffice|libreoffice-fresh|
+app|everyday|thunderbird|-|Thunderbird|thunderbird|
+app|everyday|bitwarden|-|Bitwarden|flatpak:com.bitwarden.desktop|
+app|everyday|zathura|-|Zathura|zathura zathura-pdf-mupdf|
+app|everyday|localsend|-|LocalSend|aur:localsend-bin|
+
+group|media|Media
+app|media|spotify|*|Spotify|spotify-launcher|
+app|media|vlc|*|VLC|vlc vlc-plugins-all|
+app|media|obs|-|OBS Studio|obs-studio|
+app|media|audacity|-|Audacity|audacity|
+
+group|creative|Creative
+app|creative|gimp|-|GIMP|gimp|
+app|creative|krita|-|Krita|krita|
+app|creative|inkscape|-|Inkscape|inkscape|
+app|creative|kdenlive|-|Kdenlive|kdenlive|
+app|creative|blender|-|Blender|blender|
+
+group|gaming|Gaming
+app|gaming|steam|-|Steam|steam|multilib,gpu32
+app|gaming|lutris|-|Lutris|lutris wine winetricks|
+app|gaming|heroic|-|Heroic Games Launcher|aur:heroic-games-launcher-bin|
+app|gaming|gamemode|-|GameMode|gamemode lib32-gamemode|multilib
+app|gaming|mangohud|-|MangoHud|mangohud lib32-mangohud|multilib
+app|gaming|protonup|-|ProtonUp-Qt|aur:protonup-qt|
+app|gaming|wine|-|Wine|wine winetricks|
+
+group|system|System tools
+app|system|yazi|-|Yazi|yazi ffmpeg 7zip poppler resvg chafa|
+app|system|flatpak|-|Flatpak|flatpak|
+app|system|snapper|-|Snapper|snapper snap-pac grub-btrfs inotify-tools|btrfs
+app|system|gparted|-|GParted|gparted|
+app|system|ufw|-|UFW firewall|ufw|
+
+# Languages: runtime and package manager only; LSP, formatter and parser come from LazyVim.
+lang|python|Python|python uv|
+lang|php|PHP|php composer|
+lang|gdscript|GDScript (Godot)|godot|
+lang|js|JavaScript/TypeScript|nodejs npm|
+lang|rust|Rust|rustup|
+lang|go|Go|go|
+lang|cpp|C/C++|clang cmake|
+lang|csharp|C#|dotnet-sdk|
+lang|java|Java|jdk25-openjdk maven gradle|
+lang|lua|Lua|lua luarocks|

@@ -11,6 +11,8 @@ export NUSKU_ROOT
 source "$REPO_ROOT/lib/log.sh"
 # shellcheck source=lib/answers.sh
 source "$REPO_ROOT/lib/answers.sh"
+# shellcheck source=lib/apps.sh
+source "$REPO_ROOT/lib/apps.sh"
 # shellcheck source=lib/ui.sh
 source "$REPO_ROOT/lib/ui.sh"
 # shellcheck source=lib/backup.sh

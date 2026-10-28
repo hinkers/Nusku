@@ -11,7 +11,7 @@ if ! declare -p NUSKU_ACCENTS >/dev/null 2>&1; then
     declare -gra NUSKU_ACCENTS=(rosewater flamingo pink mauve red maroon peach yellow green teal sky sapphire blue lavender)
 fi
 
-_NUSKU_ANSWER_KEYS=(GPU NVIDIA_MODULE AUR_HELPER ACCENT APPS TEST_AUTOLOGIN)
+_NUSKU_ANSWER_KEYS=(GPU NVIDIA_MODULE AUR_HELPER ACCENT APPS LANGS TEST_AUTOLOGIN)
 
 _answers_known_key() {
     local k
@@ -94,6 +94,9 @@ answers_validate() {
     esac
     _answers_require_in AUR_HELPER paru yay
     _answers_require_in ACCENT "${NUSKU_ACCENTS[@]}"
+    if declare -F apps_validate_answers >/dev/null; then
+        apps_validate_answers
+    fi
     if [ -n "${NUSKU_ANSWERS[TEST_AUTOLOGIN]:-}" ]; then
         _answers_require_in TEST_AUTOLOGIN 0 1
     fi
