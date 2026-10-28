@@ -28,7 +28,7 @@ _have_hyprland() {
 # Wait up to ~5 s for the hyprpaper IPC socket to answer (login race).
 _wait_ready() {
     local i
-    for ((i = 0; i < 50; i++)); do
+    for ((i = 0; i < ${NUSKU_HYPRPAPER_WAIT:-50}; i++)); do
         if hyprctl hyprpaper listactive >/dev/null 2>&1; then
             return 0
         fi
@@ -37,14 +37,46 @@ _wait_ready() {
     return 1
 }
 
+# _detect_backend: set BACKEND to hyprpaper (its IPC answers), swaybg (fallback where
+# hyprpaper cannot start, e.g. Hyper-V: no render node, so no linux-dmabuf, which
+# hyprpaper 0.8's toolkit requires) or none.
+BACKEND=""
+_detect_backend() {
+    [ -z "$BACKEND" ] || return 0
+    if ! _have_hyprland; then
+        BACKEND=none
+    elif _wait_ready; then
+        BACKEND=hyprpaper
+    elif command -v swaybg >/dev/null 2>&1; then
+        BACKEND=swaybg
+    else
+        BACKEND=none
+        warn "hyprpaper did not answer; wallpaper not applied"
+    fi
+}
+
 # _apply MONITOR FILE: the only place that talks to hyprpaper (0.8: wallpaper MON,PATH,FIT).
 _apply() {
-    _have_hyprland || return 0
-    if ! _wait_ready; then
-        warn "hyprpaper did not answer; wallpaper not applied"
-        return 0
-    fi
+    _detect_backend
+    [ "$BACKEND" = hyprpaper ] || return 0
     hyprctl hyprpaper wallpaper "$1,$2,cover" >/dev/null 2>&1 || warn "hyprpaper rejected $2 for '$1'"
+}
+
+# _swaybg_sync: (re)start swaybg from the saved state ("fill" = cover). swaybg prefers an
+# exact output match over the * entry, like the hyprpaper path.
+_swaybg_sync() {
+    _detect_backend
+    [ "$BACKEND" = swaybg ] || return 0
+    local line k v args=()
+    while IFS= read -r line; do
+        [ -n "$line" ] || continue
+        k="${line%%=*}"
+        v="${line#*=}"
+        [ -f "$v" ] && args+=(-o "$k" -i "$v" -m fill)
+    done <"$state_file"
+    [ "${#args[@]}" -gt 0 ] || return 0
+    pkill -x -u "$(id -u)" swaybg 2>/dev/null || true
+    setsid -f swaybg "${args[@]}" >/dev/null 2>&1 </dev/null || warn "swaybg failed to start"
 }
 
 _monitors() {
@@ -126,6 +158,7 @@ cmd_set() {
     else
         _apply "$key" "$file"
     fi
+    _swaybg_sync
 }
 
 # _prune_missing: drop saved entries whose file is gone (e.g. the repo was moved);
@@ -181,6 +214,7 @@ cmd_restore() {
         fi
     fi
     _update_link
+    _swaybg_sync
 }
 
 cmd_list() {

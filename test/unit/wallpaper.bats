@@ -11,6 +11,7 @@ setup() {
     cat >"$BATS_TEST_TMPDIR/bin/hyprctl" <<'STUB'
 #!/usr/bin/env bash
 printf '%s\n' "$*" >>"$HCLOG"
+[ "$1" = "hyprpaper" ] && [ -n "${HYPRPAPER_DOWN:-}" ] && exit 1
 if [ "$1" = "monitors" ]; then
     printf '[{"name":"DP-1"},{"name":"HDMI-A-1"}]\n'
 fi
@@ -129,4 +130,50 @@ STUB
     [ "$status" -eq 0 ]
     grep -qx '\*=.*/wallpapers/space.png' "$STATE/wallpapers"
     [ "$(wc -l <"$STATE/wallpapers")" -eq 1 ]
+}
+
+swaybg_stub() {
+    export HYPRPAPER_DOWN=1 NUSKU_HYPRPAPER_WAIT=1
+    export SBLOG="$BATS_TEST_TMPDIR/swaybg.log"
+    cat >"$BATS_TEST_TMPDIR/bin/swaybg" <<'STUB'
+#!/usr/bin/env bash
+printf '%s\n' "$*" >>"$SBLOG"
+STUB
+    chmod +x "$BATS_TEST_TMPDIR/bin/swaybg"
+}
+
+# setsid -f returns before the stub has written its log.
+wait_sblog() {
+    local i
+    for ((i = 0; i < 50; i++)); do
+        [ -s "$SBLOG" ] && return 0
+        sleep 0.1
+    done
+    return 1
+}
+
+@test "falls back to swaybg when hyprpaper does not answer" {
+    swaybg_stub
+    run scripts/nusku-wallpaper set "$BATS_TEST_TMPDIR/one.png" all
+    [ "$status" -eq 0 ]
+    wait_sblog
+    [ "$(cat "$SBLOG")" = "-o * -i $BATS_TEST_TMPDIR/one.png -m fill" ]
+    run ! grep -q "hyprpaper wallpaper" "$HCLOG"
+}
+
+@test "swaybg fallback restore passes per-monitor and * entries" {
+    swaybg_stub
+    mkdir -p "$STATE"
+    printf '*=%s\nDP-1=%s\n' "$BATS_TEST_TMPDIR/one.png" "$BATS_TEST_TMPDIR/two.jpg" >"$STATE/wallpapers"
+    run scripts/nusku-wallpaper restore
+    [ "$status" -eq 0 ]
+    wait_sblog
+    [ "$(cat "$SBLOG")" = "-o * -i $BATS_TEST_TMPDIR/one.png -m fill -o DP-1 -i $BATS_TEST_TMPDIR/two.jpg -m fill" ]
+}
+
+@test "no hyprpaper and no swaybg warns but succeeds" {
+    export HYPRPAPER_DOWN=1 NUSKU_HYPRPAPER_WAIT=1
+    run scripts/nusku-wallpaper set "$BATS_TEST_TMPDIR/one.png" all
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"hyprpaper did not answer"* ]]
 }
