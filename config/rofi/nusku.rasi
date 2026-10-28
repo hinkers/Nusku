@@ -30,11 +30,14 @@ entry { placeholder: "Search"; placeholder-color: @overlay0; }
 
 listview { lines: 8; scrollbar: false; spacing: 4px; }
 
-element { padding: 8px 12px; border-radius: 8px; }
+element { padding: 8px 12px; border-radius: 8px; spacing: 10px; }
 element normal.normal, element alternate.normal { background-color: transparent; text-color: @text; }
 element selected.normal, element selected.active {
     background-color: @accent;
     text-color: @crust;
 }
 element normal.active, element alternate.active { text-color: @accent; }
+/* The * rule above gives every widget @text; let the row's colour (crust when selected) through. */
+element-text, element-icon { text-color: inherit; }
+element-text { vertical-align: 0.5; }
 element-icon { size: 1.5em; }
