@@ -144,7 +144,7 @@ out="$(Hyprland --verify-config 2>&1)"
 rc=$?
 printf "%s\n" "$out" | grep -v DEBUG
 if [ "$rc" -eq 0 ] && printf "%s\n" "$out" | grep -q "^config ok" &&
-    printf "%s\n" "$out" | grep -q "Using lua config found at $HOME/.config/hypr/hyprland.lua"; then
+    printf "%s\n" "$out" | grep -Eq "(Using lua config found|Regular config) at $HOME/.config/hypr/hyprland.lua"; then
     pass "Hyprland --verify-config: Lua config ok"
 else
     printf "%s\n" "$out" | tail -n 30
@@ -154,6 +154,41 @@ if printf "%s\n" "$out" | grep -Eqi "legacy config|deprecat|will be removed|0\.5
     bad "Hyprland reports the legacy/deprecated config format"
 else
     pass "no legacy-config or deprecation message"
+fi
+
+if pacman -Q neovim github-cli lazygit yazi zathura docker go lua; then
+    pass "app and language packages installed"
+else
+    bad "pacman -Q of the picked apps failed"
+fi
+case "$(readlink "$HOME/.config/nvim")" in
+    /nusku/*) pass "~/.config/nvim links into /nusku" ;;
+    *) bad "~/.config/nvim links to $(readlink "$HOME/.config/nvim" 2>&1)" ;;
+esac
+if [ "$(grep -v "^--" "$HOME/.config/nusku/nvim-languages.lua")" = "return { \"go\", \"lua\" }" ]; then
+    pass "nvim-languages.lua lists go and lua"
+else
+    bad "nvim-languages.lua: $(cat "$HOME/.config/nusku/nvim-languages.lua" 2>&1)"
+fi
+for f in "$HOME/.local/share/nvim/site/parser/go.so" "$HOME/.local/share/nvim/mason/bin/gopls"; do
+    if [ -e "$f" ]; then pass "$f exists"; else bad "$f missing"; fi
+done
+if [ "$(systemctl is-enabled docker.service 2>&1)" = enabled ]; then
+    pass "docker.service enabled"
+else
+    bad "docker.service: $(systemctl is-enabled docker.service 2>&1)"
+fi
+# getent, not id -nG: this shell predates the usermod.
+if getent group docker | cut -d: -f4 | tr "," "
+" | grep -qx "$(id -un)"; then
+    pass "user is in the docker group"
+else
+    bad "docker group: $(getent group docker)"
+fi
+if grep -q "Not installed" /tmp/update.log "$state"/install-*.log; then
+    bad "an optional app failed: $(grep -h -A8 "Not installed" /tmp/update.log | head -n 12)"
+else
+    pass "no optional app failures"
 fi
 
 if [ "$fail" -eq 0 ]; then

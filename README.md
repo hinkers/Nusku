@@ -13,10 +13,46 @@ git clone https://github.com/<user>/nusku.git && cd nusku && ./install.sh
 ```bash
 nusku-update               # git pull --ff-only, then ./install.sh --update
 ./install.sh --update      # re-apply every step with your saved answers, no questions
-./install.sh --reconfigure # ask the questions again (GPU, driver, AUR helper, accent)
+./install.sh --reconfigure # ask the questions again (GPU, driver, AUR helper, accent, apps)
 ```
 
 Your answers are saved in `~/.config/nusku/answers`.
+
+## Optional apps and languages
+
+The installer asks which extra apps to install, group by group (a `None` item clears a group). The ★ items are pre-selected on a fresh install.
+
+| Group | Apps |
+| --- | --- |
+| Dev | Neovim (LazyVim) ★, GitHub CLI ★, Claude Code ★, lazygit, Docker + Compose, VS Code |
+| Everyday | Firefox ★, Discord ★, Obsidian ★, LibreOffice, Thunderbird, Bitwarden (Flatpak), Zathura, LocalSend |
+| Media | Spotify ★, VLC ★, OBS Studio, Audacity |
+| Creative | GIMP, Krita, Inkscape, Kdenlive, Blender |
+| Gaming | Steam, Lutris, Heroic, GameMode, MangoHud, ProtonUp-Qt, Wine (multilib is enabled when needed) |
+| System tools | Yazi, Flatpak, Snapper (btrfs roots only), GParted, UFW firewall |
+
+Then pick programming languages: Python, PHP, GDScript, JavaScript/TypeScript, Rust, Go, C/C++, C#, Java, Lua. Each installs its runtime and package manager; the Neovim language server, formatter and parser come from LazyVim.
+
+```bash
+./install.sh --apps        # re-open only the app and language picker, starting from your saved picks
+./install.sh --reconfigure # ask everything again, with the picker starting from the ★ defaults
+```
+
+Apps from the AUR or Flathub are optional: if one fails to install, the rest carry on and the summary lists it under "Not installed (see the log)". Setup notes appear under "Notes".
+
+### Neovim
+
+`~/.config/nvim` is [LazyVim](https://www.lazyvim.org/) in Catppuccin Mocha with your accent colour. The installer syncs plugins, Mason tools and Treesitter parsers headless, so the first launch has nothing to download. Language extras follow the languages you picked.
+
+- Plugin versions are pinned in `config/nvim/lazy-lock.json`, and every `install.sh` or `--update` resets your plugins to those versions. To bump them, run `:Lazy update`, copy `~/.local/share/nvim/lazy-lock.json` over `config/nvim/lazy-lock.json` in the repo, and commit it.
+- Extras you add by hand with `:LazyExtras` stay local (`config/nvim/lazyvim.json` is gitignored).
+- GDScript's language server only works while the Godot editor is open.
+- `Super + Shift + E` opens Yazi when it is installed.
+
+### Docker and the firewall
+
+- Docker adds you to the `docker` group, which is root-equivalent. Log out and back in to use `docker` without `sudo`.
+- UFW denies incoming traffic by default. When LocalSend is also picked, port 53317 (TCP and UDP) is opened for it.
 
 ## Changing the accent
 

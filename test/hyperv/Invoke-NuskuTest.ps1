@@ -8,7 +8,7 @@
     2. Wait for an IPv4 address (via Hyper-V KVP) and for SSH.
     3. Package the working tree (tracked + untracked, honouring .gitignore,
        including uncommitted changes), copy it to ~/nusku and extract it.
-    4. Run install.sh non-interactively with test/answers/vm.answers.
+    4. Run install.sh non-interactively with the answers file (default test/answers/vm.answers).
     5. Reboot, wait for SDDM autologin to start Hyprland and Waybar.
     6. Check services and processes, print a PASS/WARN/FAIL table.
     7. Screenshot the desktop, a kitty window and the rofi launcher with grim.
@@ -22,6 +22,11 @@
 .PARAMETER User
     Guest user (default tester). Needs NOPASSWD sudo and the nusku_test key.
 
+.PARAMETER Answers
+    Answers file, relative to the repo root (default test/answers/vm.answers).
+    When it has an APPS line, the app checks and an extra Neovim screenshot run too.
+    test/answers/vm-full.answers installs every app and language.
+
 .PARAMETER KeepRunning
     Leave the VM running at the end. By default it is shut down (Stop-VM).
 
@@ -33,6 +38,7 @@
 param(
     [string]$Name = 'nusku-test',
     [string]$User = 'tester',
+    [string]$Answers = 'test/answers/vm.answers',
     [switch]$KeepRunning
 )
 
@@ -160,6 +166,9 @@ if (-not $snap) {
     Stop-WithError "Checkpoint '$Checkpoint' not found on VM '$Name'. Take it after the base install: Checkpoint-VM -Name $Name -SnapshotName $Checkpoint"
 }
 
+if (-not (Test-Path (Join-Path $RepoRoot $Answers))) { Stop-WithError "Answers file '$Answers' not found under the repo root." }
+$Answers = $Answers -replace '\\', '/'
+$HasApps = [bool](Select-String -Path (Join-Path $RepoRoot $Answers) -Pattern '^APPS=' -Quiet)
 New-Item -ItemType Directory -Force $OutDir | Out-Null
 $installFailed = $false
 
@@ -232,7 +241,7 @@ Remove-Item -Recurse -Force $tmp -ErrorAction SilentlyContinue
 # --------------------------------------------------------------- 4. install
 Write-Step 'Running install.sh (this takes a while)'
 & ssh.exe -n @SshOpts "$User@$($script:Ip)" `
-    'cd ~/nusku && NUSKU_NONINTERACTIVE=1 ./install.sh --answers test/answers/vm.answers --no-reboot'
+    "cd ~/nusku && set -o pipefail && NUSKU_NONINTERACTIVE=1 ./install.sh --answers $Answers --no-reboot 2>&1 | tee ~/install.out"
 $installExit = $LASTEXITCODE
 if ($installExit -ne 0) { $installFailed = $true }
 Write-Host "    install.sh exit code: $installExit"
@@ -353,6 +362,37 @@ if ($notices.Trim() -eq '0:') { Add-Result 'hyprland notifications' 'PASS' 'none
 elseif ($notices -match '\.conf|0\.57') { Add-Result 'hyprland notifications' 'FAIL' "$notices" }
 else { Add-Result 'hyprland notifications' 'WARN' "$notices" }
 
+if ($HasApps) {
+    $cmds = 'nvim gh claude lazygit docker code firefox discord obsidian libreoffice thunderbird zathura localsend spotify-launcher vlc obs audacity gimp krita inkscape kdenlive blender steam lutris heroic gamemoded mangohud protonup-qt wine yazi flatpak gparted ufw'
+    foreach ($c in $cmds.Split(' ')) {
+        $null = Invoke-Remote "command -v $c"
+        if ($script:RemoteExit -eq 0) { Add-Result "command $c" 'PASS' 'found' }
+        else { Add-Result "command $c" 'FAIL' 'not found' }
+    }
+    $null = Invoke-Remote 'flatpak info com.bitwarden.desktop >/dev/null'
+    if ($script:RemoteExit -eq 0) { Add-Result 'flatpak bitwarden' 'PASS' 'installed' }
+    else { Add-Result 'flatpak bitwarden' 'FAIL' 'not installed' }
+    foreach ($svc in 'docker', 'ufw') {
+        $st = ((Invoke-Remote "systemctl is-enabled $svc") | Select-Object -First 1)
+        if ($st -eq 'enabled') { Add-Result "enabled $svc" 'PASS' $st } else { Add-Result "enabled $svc" 'FAIL' "$st" }
+    }
+    $null = Invoke-Remote 'sudo ufw status | grep -q 53317'
+    if ($script:RemoteExit -eq 0) { Add-Result 'ufw allows 53317' 'PASS' 'LocalSend port open' }
+    else { Add-Result 'ufw allows 53317' 'FAIL' 'port 53317 not in ufw status' }
+    $null = Invoke-Remote 'grep -q multilib /etc/pacman.conf'
+    if ($script:RemoteExit -eq 0) { Add-Result 'multilib enabled' 'PASS' 'pacman.conf' }
+    else { Add-Result 'multilib enabled' 'FAIL' 'not in pacman.conf' }
+    $null = Invoke-Remote 'grep -q "Skipping Snapper" ~/.local/state/nusku/install-*.log'
+    if ($script:RemoteExit -eq 0) { Add-Result 'snapper skipped (ext4)' 'PASS' 'logged' }
+    else { Add-Result 'snapper skipped (ext4)' 'FAIL' 'no "Skipping Snapper" in the log' }
+    $null = Invoke-Remote 'grep -q "Not installed" ~/install.out'
+    if ($script:RemoteExit -ne 0) { Add-Result 'no optional app failures' 'PASS' 'summary clean' }
+    else {
+        $fl = (Invoke-Remote 'grep -A12 "Not installed" ~/install.out') -join ' / '
+        Add-Result 'no optional app failures' 'FAIL' "$fl"
+    }
+}
+
 $results | Format-Table -AutoSize | Out-String | Write-Host
 $checksFailed = @($results | Where-Object { $_.Result -eq 'FAIL' }).Count -gt 0
 
@@ -388,6 +428,28 @@ $null = Invoke-Remote ($envPreamble + "`nhyprctl dispatch 'hl.dsp.exec_cmd(`"rof
 Start-Sleep -Seconds 4   # software rendering: give rofi time to map and animate in
 Save-Screenshot 'rofi.png'
 $null = Invoke-Remote 'pkill -x -u "$(id -u)" rofi || true'
+if ($HasApps) {
+    $null = Invoke-Remote @'
+printf 'import os
+
+
+class Greeter:
+    def __init__(self, name: str) -> None:
+        self.name = name
+
+    def greet(self) -> str:
+        return f"Hello, {self.name}!"
+
+
+if __name__ == "__main__":
+    print(Greeter(os.getenv("USER", "world")).greet())
+' > /tmp/demo.py
+'@
+    $null = Invoke-Remote ($envPreamble + "`nhyprctl dispatch 'hl.dsp.exec_cmd(`"kitty -e nvim /tmp/demo.py`")' >/dev/null")
+    Start-Sleep -Seconds 5
+    $null = Invoke-Remote ($envPreamble + $moveCursor)
+    Save-Screenshot 'neovim.png'
+}
 
 # ---------------------------------------------------------------- finish
 if (-not $KeepRunning) {

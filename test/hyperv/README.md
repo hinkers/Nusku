@@ -85,3 +85,12 @@ Checkpoint-VM -Name nusku-test -SnapshotName clean-arch
 ```
 
 Restore later with `Restore-VMSnapshot -VMName nusku-test -Name clean-arch -Confirm:$false`.
+
+## 5. Running the test loop
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File test/hyperv/Invoke-NuskuTest.ps1
+powershell -NoProfile -ExecutionPolicy Bypass -File test/hyperv/Invoke-NuskuTest.ps1 -Answers test/answers/vm-full.answers
+```
+
+`-Answers` takes a repo-relative path (default `test/answers/vm.answers`, a Stage 1 style install with no apps). With an answers file that has an `APPS` line, the run also checks that every app's command exists, the Flatpak, Docker and UFW services, the LocalSend port, multilib and that Snapper was skipped on ext4, and adds a Neovim screenshot. `vm-full.answers` picks every app and language; a full run needs about 25 GB of the VM's 60 GB disk and takes 1 to 2 hours.
