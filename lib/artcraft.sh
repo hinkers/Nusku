@@ -41,18 +41,18 @@ artcraft_fetch() {
     local repo="$1" dir="$2" url sums line sum file
     url="$NUSKU_ARTCRAFT_BASE/$repo/releases/latest/download"
     sums="$dir/SHA256SUMS.txt"
-    curl -fsSL --retry 2 -o "$sums" "$url/SHA256SUMS.txt" || {
+    curl -fsSL --retry 2 -o "$sums" "$url/SHA256SUMS.txt" 2>>"${NUSKU_LOG:-/dev/null}" || {
         echo "download failed" >&2
         return 1
     }
     line="$(awk '{ f = $2; sub(/^\*/, "", f) } f ~ /-linux-x86_64\.pkg\.tar\.zst$/ { print $1, f; exit }' "$sums")"
-    if [ -z "$line" ]; then
+    if [ -z "$line" ] || [[ "${line#* }" == */* ]]; then
         echo "no x86_64 Arch package in the latest release" >&2
         return 1
     fi
     sum="${line% *}"
     file="${line#* }"
-    curl -fsSL --retry 2 -o "$dir/$file" "$url/$file" || {
+    curl -fsSL --retry 2 -o "$dir/$file" "$url/$file" 2>>"${NUSKU_LOG:-/dev/null}" || {
         echo "download failed" >&2
         return 1
     }

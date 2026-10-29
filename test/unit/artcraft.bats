@@ -25,7 +25,7 @@ while [ $# -gt 0 ]; do
 done
 echo "curl $url" >>"$CALLS"
 src="$SRV/${url#http://stub/}"
-[ -f "$src" ] || exit 22
+[ -f "$src" ] || { echo "curl: (22) The requested URL returned error: 404" >&2; exit 22; }
 cp "$src" "$out"
 STUB
     # pacman -Q / -Qq NAME: installed when listed in $INSTALLED; -U is recorded.
@@ -75,7 +75,7 @@ in_art() {
     run in_art 'artcraft_fetch photocraft "$BATS_TEST_TMPDIR" 2>&1'
     [ "$status" -ne 0 ]
     [[ "$output" == *"checksum mismatch"* ]]
-    ! grep -q 'pacman -U' "$CALLS"
+    ! grep -q 'pacman -U' "$CALLS" || false
 }
 
 @test "fetch fails when the release has no x86_64 Arch package" {
@@ -97,21 +97,21 @@ printf "%s\n" "${NUSKU_APP_FAILURES[@]}"'
     [ "$status" -eq 0 ]
     [[ "$output" == *"PhotoCraft: download failed"* ]]
     grep -q 'pacman -U --noconfirm --needed .*pdfcraft-0.17.0-linux-x86_64.pkg.tar.zst' "$CALLS"
-    ! grep -q 'photocraft.*pkg.tar.zst' <(grep 'pacman -U' "$CALLS")
+    ! grep -q 'photocraft.*pkg.tar.zst' <(grep 'pacman -U' "$CALLS") || false
 }
 
 @test "install_soft skips an installed release package" {
     echo ai.storyteller.photocraft >"$INSTALLED"
     run in_art 'artcraft_install_soft "artcraft photocraft photocraft"'
     [ "$status" -eq 0 ]
-    ! grep -q 'curl .*photocraft' "$CALLS"
+    ! grep -q 'curl .*photocraft' "$CALLS" || false
 }
 
 @test "install_soft skips an AUR copy with a note" {
     echo photocraft-bin >"$INSTALLED"
     run in_art 'artcraft_install_soft "artcraft photocraft photocraft"; printf "%s\n" "${NUSKU_APP_NOTES[@]}"'
     [ "$status" -eq 0 ]
-    ! grep -q curl "$CALLS"
+    ! grep -q curl "$CALLS" || false
     [[ "$output" == *"PhotoCraft is installed from the AUR (photocraft-bin); the ArtCraft Launcher won't update it."* ]]
 }
 
@@ -130,4 +130,28 @@ printf "%s\n" "${NUSKU_APP_NOTES[@]}" "${NUSKU_APP_FAILURES[@]}"'
     release craft-launcher
     run in_art 'artcraft_install_soft "artcraft launcher craft-launcher"; echo "new=$NUSKU_ARTCRAFT_LAUNCHER_NEW"'
     [[ "$output" == *"new=1"* ]]
+}
+
+@test "a failed download records exactly 'download failed', not curl's message" {
+    run in_art 'artcraft_install_soft "artcraft photocraft photocraft"; printf "%s\n" "${NUSKU_APP_FAILURES[@]}"'
+    [ "$status" -eq 0 ]
+    [ "$output" = "PhotoCraft: download failed" ]
+}
+
+@test "fetch reports download failed when the package itself 404s" {
+    release photocraft
+    rm "$SRV/photocraft/releases/latest/download/photocraft-0.17.0-linux-x86_64.pkg.tar.zst"
+    run in_art 'artcraft_fetch photocraft "$BATS_TEST_TMPDIR" 2>&1'
+    [ "$status" -ne 0 ]
+    [ "$output" = "download failed" ]
+}
+
+@test "fetch rejects a SHA256SUMS filename containing a slash" {
+    release photocraft
+    echo "1111111111111111111111111111111111111111111111111111111111111111  ../evil-linux-x86_64.pkg.tar.zst" \
+        >"$SRV/photocraft/releases/latest/download/SHA256SUMS.txt"
+    run in_art 'artcraft_fetch photocraft "$BATS_TEST_TMPDIR" 2>&1'
+    [ "$status" -ne 0 ]
+    [[ "$output" == *"no x86_64 Arch package"* ]]
+    ! grep -q 'evil' "$CALLS" || false
 }
