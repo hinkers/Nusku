@@ -91,6 +91,22 @@ _artcraft_one() {
     return 1
 }
 
+# artcraft_autostart_entry FILE: write the launcher's own autostart entry unless FILE exists.
+artcraft_autostart_entry() {
+    [ -e "$1" ] && return 0
+    mkdir -p "$(dirname "$1")"
+    cat >"$1" <<'ENTRY'
+[Desktop Entry]
+Type=Application
+Name=ArtCraft Launcher
+Comment=Install and update the Craft App Suite
+Exec=/usr/bin/artcraft-launcher --hidden
+Icon=ai.storyteller.artcraft-launcher
+Terminal=false
+X-GNOME-Autostart-enabled=true
+ENTRY
+}
+
 # artcraft_install_soft BATCHES: for each "artcraft APP_ID REPO" line (the launcher line comes
 # first), install the release package. A failure is recorded and the run goes on.
 artcraft_install_soft() {
@@ -103,6 +119,7 @@ artcraft_install_soft() {
             if ! artcraft_installed "$(artcraft_stem "$repo")" && ! artcraft_foreign "$(artcraft_stem "$repo")" >/dev/null; then
                 if _artcraft_one "$repo" "$label"; then
                     NUSKU_ARTCRAFT_LAUNCHER_NEW=1
+                    artcraft_autostart_entry "${XDG_CONFIG_HOME:-$HOME/.config}/autostart/ai.storyteller.artcraft-launcher.desktop"
                 else
                     NUSKU_APP_NOTES+=("The ArtCraft Launcher was not installed, so ArtCraft apps won't update until it is.")
                 fi

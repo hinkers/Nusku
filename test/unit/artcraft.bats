@@ -155,3 +155,56 @@ printf "%s\n" "${NUSKU_APP_NOTES[@]}" "${NUSKU_APP_FAILURES[@]}"'
     [[ "$output" == *"no x86_64 Arch package"* ]]
     ! grep -q 'evil' "$CALLS" || false
 }
+
+ENTRY_REL=autostart/ai.storyteller.artcraft-launcher.desktop
+
+@test "writes the autostart entry on first launcher install" {
+    release craft-launcher
+    export XDG_CONFIG_HOME="$BATS_TEST_TMPDIR/cfg"
+    run in_art 'artcraft_install_soft "artcraft launcher craft-launcher"'
+    [ "$status" -eq 0 ]
+    [ "$(cat "$XDG_CONFIG_HOME/$ENTRY_REL")" = "[Desktop Entry]
+Type=Application
+Name=ArtCraft Launcher
+Comment=Install and update the Craft App Suite
+Exec=/usr/bin/artcraft-launcher --hidden
+Icon=ai.storyteller.artcraft-launcher
+Terminal=false
+X-GNOME-Autostart-enabled=true" ]
+}
+
+@test "does not recreate a deleted entry when the launcher was already installed" {
+    echo ai.storyteller.artcraft-launcher >"$INSTALLED"
+    export XDG_CONFIG_HOME="$BATS_TEST_TMPDIR/cfg"
+    run in_art 'artcraft_install_soft "artcraft launcher craft-launcher"'
+    [ "$status" -eq 0 ]
+    [ ! -e "$XDG_CONFIG_HOME/$ENTRY_REL" ]
+}
+
+@test "does not overwrite an existing autostart entry" {
+    release craft-launcher
+    export XDG_CONFIG_HOME="$BATS_TEST_TMPDIR/cfg"
+    mkdir -p "$XDG_CONFIG_HOME/autostart"
+    echo "mine" >"$XDG_CONFIG_HOME/$ENTRY_REL"
+    run in_art 'artcraft_install_soft "artcraft launcher craft-launcher"'
+    [ "$status" -eq 0 ]
+    [ "$(cat "$XDG_CONFIG_HOME/$ENTRY_REL")" = "mine" ]
+}
+
+@test "autostart.lua runs the launcher's Exec line when the entry exists" {
+    mkdir -p "$BATS_TEST_TMPDIR/home/.config/autostart"
+    printf '[Desktop Entry]\nName=x\nExec=/usr/bin/artcraft-launcher --hidden\nIcon=y\n' \
+        >"$BATS_TEST_TMPDIR/home/.config/$ENTRY_REL"
+    HOME="$BATS_TEST_TMPDIR/home" run nvim --headless -l test/fixtures/hypr-stub.lua config/hypr/autostart.lua
+    [ "$status" -eq 0 ]
+    [ "$(grep -c artcraft <<<"$output")" -eq 1 ]
+    grep -qxF '/usr/bin/artcraft-launcher --hidden' <<<"$output"
+}
+
+@test "autostart.lua starts nothing extra without the entry" {
+    mkdir -p "$BATS_TEST_TMPDIR/home"
+    HOME="$BATS_TEST_TMPDIR/home" run nvim --headless -l test/fixtures/hypr-stub.lua config/hypr/autostart.lua
+    [ "$status" -eq 0 ]
+    ! grep -q artcraft <<<"$output" || false
+    grep -qxF 'waybar' <<<"$output"
+}
