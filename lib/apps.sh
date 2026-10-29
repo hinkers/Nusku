@@ -279,12 +279,13 @@ apps_needs_multilib() {
     return 1
 }
 
-# apps_batches GPU NVIDIA_MODULE: what to install, one line each: "repo NAME", "aur APP_ID NAME"
-# or "flatpak APP_ID ID". The gpu32 app also gets the GPU's 32-bit driver; if that driver is an
-# AUR package, the app's own packages join it in the AUR batch so they install in one transaction.
+# apps_batches GPU NVIDIA_MODULE: what to install, one line each: "repo NAME", "aur APP_ID NAME",
+# "flatpak APP_ID ID" or "artcraft APP_ID REPO" (launcher line first). The gpu32 app also gets the
+# GPU's 32-bit driver; if that driver is an AUR package, the app's own packages join it in the
+# AUR batch so they install in one transaction.
 apps_batches() {
     local gpu="${1:-}" mod="${2:-}" id t force g32_done=0 flat=0 has_aur
-    local -a lines=() own=() items=() g32=()
+    local -a lines=() own=() items=() g32=() art=()
     while IFS= read -r id; do
         items=()
         mapfile -t own < <(apps_packages "$id")
@@ -311,6 +312,7 @@ apps_batches() {
                     lines+=("flatpak $id ${t#flatpak:}")
                     ;;
                 aur:*) lines+=("aur $id ${t#aur:}") ;;
+                artcraft:*) art+=("artcraft $id ${t#artcraft:}") ;;
                 *)
                     if [ "$force" = 1 ]; then
                         lines+=("aur $id $t")
@@ -322,6 +324,7 @@ apps_batches() {
         done
     done < <(_apps_selected say)
     [ "$flat" -eq 0 ] || lines+=("repo flatpak")
+    [ "${#art[@]}" -eq 0 ] || lines+=("artcraft launcher craft-launcher" "${art[@]}")
     [ "${#lines[@]}" -eq 0 ] || printf '%s\n' "${lines[@]}"
 }
 

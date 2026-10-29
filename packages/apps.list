@@ -5,6 +5,7 @@
 #   lang|<id>|<label>|<tokens>|<flags>
 #
 # '*' marks the pre-selected favourites. Tokens: name (official repo), aur:name, flatpak:app.id.
+# artcraft:ID installs the ArtCraft release package from github.com/storytold/ID (lib/artcraft.sh).
 # Flags: multilib (needs the multilib repo), gpu32 (add the GPU's 32-bit Vulkan driver),
 # btrfs (only offered when / is btrfs). Labels contain no ',' or '|' (gum --selected is comma-separated).
 
@@ -38,6 +39,21 @@ app|creative|krita|-|Krita|krita|
 app|creative|inkscape|-|Inkscape|inkscape|
 app|creative|kdenlive|-|Kdenlive|kdenlive|
 app|creative|blender|-|Blender|blender|
+
+group|artcraft|ArtCraft
+app|artcraft|photocraft|-|PhotoCraft|artcraft:photocraft|
+app|artcraft|vectorcraft|-|VectorCraft|artcraft:vectorcraft|
+app|artcraft|filmcraft|-|FilmCraft|artcraft:filmcraft|
+app|artcraft|lightcraft|-|LightCraft|artcraft:lightcraft|
+app|artcraft|pdfcraft|-|PdfCraft|artcraft:pdfcraft|
+app|artcraft|effectcraft|-|EffectCraft|artcraft:effectcraft|
+app|artcraft|designcraft|-|DesignCraft|artcraft:designcraft|
+app|artcraft|figcraft|-|FigCraft|artcraft:figcraft|
+app|artcraft|wordcraft|-|WordCraft|artcraft:wordcraft|
+app|artcraft|soundcraft|-|SoundCraft|artcraft:soundcraft|
+app|artcraft|deckcraft|-|DeckCraft|artcraft:deckcraft|
+app|artcraft|cadcraft|-|CADCraft|artcraft:cadcraft|
+app|artcraft|gridcraft|-|GridCraft|artcraft:gridcraft|
 
 group|gaming|Gaming
 app|gaming|steam|-|Steam|steam|multilib,gpu32

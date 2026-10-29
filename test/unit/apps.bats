@@ -31,7 +31,7 @@ in_fix() {
 @test "apps_groups lists groups in file order" {
     run in_sub 'apps_groups | tr "\n" " "'
     [ "$status" -eq 0 ]
-    [ "$output" = "dev everyday media creative gaming system " ]
+    [ "$output" = "dev everyday media creative artcraft gaming system " ]
 }
 
 @test "apps_group_label and apps_label" {
@@ -813,4 +813,24 @@ nvim_stubs() {
     [[ "$output" == *"rc=124"* ]]
     [[ "$output" == *"fail=[Neovim (LazyVim): setup failed]"* ]]
     ! grep -q '^nvim ' "$CALLS" || false
+}
+
+@test "artcraft group lists 13 apps in order" {
+    run in_sub 'apps_in_group artcraft | tr "\n" " "'
+    [ "$status" -eq 0 ]
+    [ "$output" = "photocraft vectorcraft filmcraft lightcraft pdfcraft effectcraft designcraft figcraft wordcraft soundcraft deckcraft cadcraft gridcraft " ]
+    run in_sub 'apps_starred'
+    [[ " $output " != *craft* ]]
+}
+
+@test "artcraft picks add the launcher once, first" {
+    run in_sub 'answers_set APPS "photocraft pdfcraft"; apps_batches'
+    [ "$status" -eq 0 ]
+    [ "$output" = $'artcraft launcher craft-launcher\nartcraft photocraft photocraft\nartcraft pdfcraft pdfcraft' ]
+}
+
+@test "no artcraft picks, no launcher" {
+    run in_sub 'answers_set APPS "firefox"; apps_batches'
+    [ "$status" -eq 0 ]
+    [[ "$output" != *artcraft* ]]
 }

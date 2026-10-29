@@ -13,6 +13,8 @@ source "$REPO_ROOT/lib/log.sh"
 source "$REPO_ROOT/lib/answers.sh"
 # shellcheck source=lib/apps.sh
 source "$REPO_ROOT/lib/apps.sh"
+# shellcheck source=lib/artcraft.sh
+source "$REPO_ROOT/lib/artcraft.sh"
 # shellcheck source=lib/ui.sh
 source "$REPO_ROOT/lib/ui.sh"
 # shellcheck source=lib/backup.sh
@@ -270,6 +272,7 @@ step_packages() {
     pkg_install_aur "${aur_names[@]}"
     apps_install_aur_soft "$batches"
     apps_install_flatpak_soft "$batches"
+    artcraft_install_soft "$batches"
 }
 
 step_gpu() {
