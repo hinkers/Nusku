@@ -221,3 +221,13 @@ make_repo() {
     f="$XDG_CONFIG_HOME/nusku/theme/nvim-accent.lua"
     [ "$(cat "$f")" = "$(printf '%s\n' '-- Generated from theme/palette.conf by nusku-theme; do not edit.' 'return { name = "blue", hex = "#89b4fa" }')" ]
 }
+
+@test "render_all renders the Yazi theme with the flavor and the accent" {
+    run in_sub "answers_set ACCENT mauve; theme_render_all '$PWD'"
+    [ "$status" -eq 0 ]
+    y="$HOME/.config/yazi/theme.toml"
+    grep -q 'dark *= *"catppuccin-mocha"' "$y"
+    grep -qi '#cba6f7' "$y"
+    run grep -qi '89b4fa' "$y"
+    [ "$status" -eq 1 ]
+}

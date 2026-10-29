@@ -16,3 +16,5 @@ config/qt6ct .config/qt6ct
 config/qt5ct .config/qt5ct
 scripts/nusku-* .local/bin
 config/nvim .config/nvim
+config/yazi/yazi.toml .config/yazi/yazi.toml
+config/yazi/flavors .config/yazi/flavors

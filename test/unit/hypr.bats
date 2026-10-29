@@ -74,3 +74,10 @@ in_sub() {
     run grep -rnE "hyprctl dispatch +[a-z]" config scripts test/hyperv
     [ "$status" -eq 1 ]
 }
+
+@test "keybinds.lua binds SUPER+SHIFT+E to yazi only when /usr/bin/yazi exists" {
+    grep -q 'io.open("/usr/bin/yazi"' config/hypr/keybinds.lua
+    run grep -n -A4 'io.open("/usr/bin/yazi"' config/hypr/keybinds.lua
+    [[ "$output" == *'key(mod, "SHIFT", "E")'* ]]
+    [[ "$output" == *'kitty -e yazi'* ]]
+}

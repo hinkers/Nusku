@@ -12,6 +12,16 @@ end
 hl.bind(key(mod, "Return"), dsp.exec_cmd("kitty"))
 hl.bind(key(mod, "Space"),  dsp.exec_cmd("rofi -show drun"))
 hl.bind(key(mod, "E"),      dsp.exec_cmd("thunar"))
+
+-- Yazi alongside Thunar, only when installed (no dead bind otherwise)
+do
+    local f = io.open("/usr/bin/yazi", "r")
+    if f then
+        f:close()
+        hl.bind(key(mod, "SHIFT", "E"), dsp.exec_cmd("kitty -e yazi"))
+    end
+end
+
 hl.bind(key(mod, "V"),      dsp.exec_cmd("~/.local/bin/nusku-menu-clipboard"))
 hl.bind(key(mod, "W"),      dsp.exec_cmd("~/.local/bin/nusku-menu-wallpaper"))
 hl.bind(key(mod, "Escape"), dsp.exec_cmd("~/.local/bin/nusku-menu-power"))
