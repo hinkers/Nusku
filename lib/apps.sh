@@ -408,6 +408,10 @@ apps_hook_ufw() {
             run_soft sudo ufw allow 53317/udp comment LocalSend || return 1
             ;;
     esac
+    if systemctl is-enabled sshd.service >/dev/null 2>&1 || systemctl is-active sshd.service >/dev/null 2>&1; then
+        log_info "sshd is enabled: allowing SSH (22/tcp) through UFW"
+        run_soft sudo ufw allow 22/tcp comment SSH || return 1
+    fi
     run_soft sudo ufw --force enable || return 1
     run_soft sudo systemctl enable ufw.service
 }

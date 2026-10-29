@@ -240,14 +240,6 @@ Remove-Item -Recurse -Force $tmp -ErrorAction SilentlyContinue
 
 # --------------------------------------------------------------- 4. install
 Write-Step 'Running install.sh (this takes a while)'
-if ($HasApps) {
-    # The ufw app enables a default-deny firewall, which would cut off this SSH session.
-    # Add the SSH rule as soon as ufw is installed (while it is still inactive); the
-    # installer's later 'ufw enable' keeps it.
-    $null = Invoke-Remote @'
-nohup bash -c 'until command -v ufw >/dev/null && [ -d /etc/ufw ]; do sleep 1; done; sleep 1; sudo ufw allow 22/tcp >/dev/null 2>&1' >/dev/null 2>&1 &
-'@
-}
 & ssh.exe -n @SshOpts "$User@$($script:Ip)" `
     "cd ~/nusku && set -o pipefail && NUSKU_NONINTERACTIVE=1 ./install.sh --answers $Answers --no-reboot 2>&1 | tee ~/install.out"
 $installExit = $LASTEXITCODE
@@ -387,6 +379,9 @@ if ($HasApps) {
     $null = Invoke-Remote 'sudo ufw status | grep -q 53317'
     if ($script:RemoteExit -eq 0) { Add-Result 'ufw allows 53317' 'PASS' 'LocalSend port open' }
     else { Add-Result 'ufw allows 53317' 'FAIL' 'port 53317 not in ufw status' }
+    $null = Invoke-Remote 'sudo ufw status | grep -qE "^22/tcp"'
+    if ($script:RemoteExit -eq 0) { Add-Result 'ufw allows 22' 'PASS' 'SSH port open' }
+    else { Add-Result 'ufw allows 22' 'FAIL' '22/tcp not in ufw status' }
     $null = Invoke-Remote 'grep -q multilib /etc/pacman.conf'
     if ($script:RemoteExit -eq 0) { Add-Result 'multilib enabled' 'PASS' 'pacman.conf' }
     else { Add-Result 'multilib enabled' 'FAIL' 'not in pacman.conf' }

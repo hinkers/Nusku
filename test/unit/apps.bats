@@ -433,6 +433,7 @@ STUB
     done
     printf '#!/bin/sh\necho "id $*" >>"$CALLS"\necho "${ID_GROUPS:-wheel}"\n' >"$STUBS/id"
     printf '#!/bin/sh\nexit "${FINDMNT_RC:-1}"\n' >"$STUBS/findmnt"
+    printf '#!/bin/sh\necho "systemctl $*" >>"$CALLS"\ncase "$*" in *sshd.service*) [ -n "${SSHD_ON:-}" ] || exit 1 ;; esac\nexit 0\n' >"$STUBS/systemctl"
     chmod +x "$STUBS"/*
 }
 
@@ -494,6 +495,22 @@ in_hooks() {
     run in_hooks "answers_set APPS ufw; apps_run_hooks"
     grep -q 'sudo ufw --force enable' "$CALLS"
     grep -q 'sudo systemctl enable ufw.service' "$CALLS"
+}
+
+@test "ufw hook keeps SSH open when sshd is enabled" {
+    hook_stubs
+    SSHD_ON=1 run in_hooks "answers_set APPS ufw; apps_run_hooks"
+    [ "$status" -eq 0 ]
+    grep -q 'sudo ufw allow 22/tcp comment SSH' "$CALLS"
+    [ "$(grep -n 'ufw allow 22/tcp' "$CALLS" | cut -d: -f1)" -lt "$(grep -n 'ufw --force enable' "$CALLS" | cut -d: -f1)" ]
+}
+
+@test "ufw hook adds no SSH rule when sshd is off" {
+    hook_stubs
+    run in_hooks "answers_set APPS ufw; apps_run_hooks"
+    [ "$status" -eq 0 ]
+    ! grep -q '22/tcp' "$CALLS" || false
+    grep -q 'sudo ufw --force enable' "$CALLS"
 }
 
 @test "flatpak hook adds the Flathub remote" {

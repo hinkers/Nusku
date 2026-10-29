@@ -52,7 +52,7 @@ Apps from the AUR or Flathub are optional: if one fails to install, the rest car
 ### Docker and the firewall
 
 - Docker adds you to the `docker` group, which is root-equivalent. Log out and back in to use `docker` without `sudo`.
-- UFW denies incoming traffic by default. When LocalSend is also picked, port 53317 (TCP and UDP) is opened for it.
+- UFW denies incoming traffic by default. When LocalSend is also picked, port 53317 (TCP and UDP) is opened for it. SSH (22/tcp) is allowed automatically if the SSH server is enabled.
 
 ## Changing the accent
 
