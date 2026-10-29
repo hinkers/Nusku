@@ -210,6 +210,11 @@ if [ -x "$HOME/.local/bin/nusku-menu-keybinds" ]; then
 else
     bad "~/.local/bin/nusku-menu-keybinds missing"
 fi
+if [ -x "$HOME/.local/bin/nusku-fetch" ] && grep -q 'nusku-fetch' "$HOME/.zshrc" 2>/dev/null; then
+    pass "nusku-fetch linked and called from zshrc"
+else
+    bad "nusku-fetch not linked or not called from zshrc"
+fi
 # --verify-config above loaded keybinds.lua, which writes the keybind menu manifest.
 if grep -q "	Screenshot a region	" "$XDG_RUNTIME_DIR/nusku/keybinds.tsv" 2>/dev/null; then
     pass "keybind manifest lists Screenshot a region"

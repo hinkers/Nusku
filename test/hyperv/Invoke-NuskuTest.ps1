@@ -169,6 +169,7 @@ if (-not $snap) {
 if (-not (Test-Path (Join-Path $RepoRoot $Answers))) { Stop-WithError "Answers file '$Answers' not found under the repo root." }
 $Answers = $Answers -replace '\\', '/'
 $HasApps = [bool](Select-String -Path (Join-Path $RepoRoot $Answers) -Pattern '^APPS=' -Quiet)
+$HasPokemon = [bool](Select-String -Path (Join-Path $RepoRoot $Answers) -Pattern '^APPS=.*pokemon' -Quiet)
 $HasArtCraft = [bool](Select-String -Path (Join-Path $RepoRoot $Answers) -Pattern '^APPS=.*\bphotocraft\b' -Quiet)
 New-Item -ItemType Directory -Force $OutDir | Out-Null
 $installFailed = $false
@@ -409,6 +410,18 @@ $wsText = ($wsOut -join ' / ')
 if ($script:RemoteExit -eq 0 -and $wsText -match 'active: 2') { Add-Result 'dispatch manifest expr' 'PASS' $wsText }
 else { Add-Result 'dispatch manifest expr' 'FAIL' "exit $($script:RemoteExit): $wsText" }
 
+if ($HasPokemon) {
+    $kr = (Invoke-Remote 'pacman -Q krabby-bin') -join ' / '
+    if ($script:RemoteExit -eq 0) { Add-Result 'krabby package' 'PASS' $kr }
+    else { Add-Result 'krabby package' 'FAIL' "$kr" }
+    # krabby draws sprites with half-block characters (U+2580 / U+2584) and truecolor escapes;
+    # the Arch logo uses neither. Byte-wise grep so the guest locale does not matter.
+    $fetch = (Invoke-Remote 'out=$(~/.local/bin/nusku-fetch 2>&1); printf "%s
+" "$out" | LC_ALL=C grep -cP "â[]"') -join ' '
+    if ($script:RemoteExit -eq 0 -and [int]$fetch -gt 0) { Add-Result 'nusku-fetch pokemon sprite' 'PASS' "$fetch sprite lines" }
+    else { Add-Result 'nusku-fetch pokemon sprite' 'FAIL' "exit $($script:RemoteExit): $fetch" }
+}
+
 if ($HasArtCraft) {
     $pk = (Invoke-Remote 'pacman -Q ai.storyteller.artcraft-launcher ai.storyteller.photocraft') -join ' / '
     if ($script:RemoteExit -eq 0) { Add-Result 'artcraft packages' 'PASS' $pk }
@@ -507,7 +520,7 @@ Save-Screenshot 'desktop.png'
 $null = Invoke-Remote ($envPreamble + "`nhyprctl dispatch 'hl.dsp.exec_cmd(`"kitty`")' >/dev/null")
 Start-Sleep -Seconds 5
 $null = Invoke-Remote ($envPreamble + $moveCursor)
-Save-Screenshot 'window.png'
+Save-Screenshot 'window.png'   # the fresh kitty shows the nusku-fetch greeting
 $null = Invoke-Remote ($envPreamble + "`nhyprctl dispatch 'hl.dsp.exec_cmd(`"rofi -show drun`")' >/dev/null")
 Start-Sleep -Seconds 4   # software rendering: give rofi time to map and animate in
 Save-Screenshot 'rofi.png'

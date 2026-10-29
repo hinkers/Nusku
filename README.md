@@ -30,7 +30,9 @@ The installer asks which extra apps to install, group by group (a `None` item cl
 | Creative | GIMP, Krita, Inkscape, Kdenlive, Blender |
 | ArtCraft | PhotoCraft, VectorCraft, FilmCraft, LightCraft, PdfCraft, EffectCraft, DesignCraft, FigCraft, WordCraft, SoundCraft, DeckCraft, CADCraft, GridCraft |
 | Gaming | Steam, Lutris, Heroic, GameMode, MangoHud, ProtonUp-Qt, Wine (multilib is enabled when needed) |
-| System tools | Yazi, Flatpak, Snapper (btrfs roots only), GParted, UFW firewall |
+| System tools | Yazi, Flatpak, Snapper (btrfs roots only), GParted, UFW firewall, Pokémon in fastfetch |
+
+Every new terminal greets you with fastfetch (Arch logo, Nerd Font icons, Catppuccin colours). Tick **Pokémon in fastfetch** (System tools) to swap the logo for a random Gen 1-3 Pokémon from [krabby](https://github.com/yannjor/krabby); shinies show up at krabby's default 1/128. Turn it on later with `./install.sh --apps`. Unticking it later does not uninstall krabby, so the Pokémon stays until you remove the `krabby-bin` package. Nusku ships no Pokémon art.
 
 The language picker opens right after the Dev group's checklist: Python, PHP, GDScript, JavaScript/TypeScript, Rust, Go, C/C++, C#, Java, Lua. Each installs its runtime and package manager; the Neovim language server, formatter and parser come from LazyVim. Esc leaves a checklist unchanged; Ctrl+C cancels the install.
 

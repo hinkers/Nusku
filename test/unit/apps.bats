@@ -279,10 +279,10 @@ ask() {
 
 @test "snapper not offered on ext4" {
     export NUSKU_ROOT_FSTYPE=ext4
-    fake_gum 'System tools (0/4)' ESC Done
+    fake_gum 'System tools (0/5)' ESC Done
     run ask ':'
     [ "$status" -eq 0 ]
-    grep -qxF 'System tools (0/4)' "$GUM_DIR/call-1"
+    grep -qxF 'System tools (0/5)' "$GUM_DIR/call-1"
     run grep -c 'Snapper' "$GUM_DIR/call-2"
     [ "$output" = 0 ]
     grep -qF 'GParted' "$GUM_DIR/call-2"
@@ -290,7 +290,7 @@ ask() {
 
 @test "snapper offered on btrfs" {
     export NUSKU_ROOT_FSTYPE=btrfs
-    fake_gum 'System tools (0/5)' ESC Done
+    fake_gum 'System tools (0/6)' ESC Done
     run ask ':'
     [ "$status" -eq 0 ]
     grep -qF 'Snapper' "$GUM_DIR/call-2"
