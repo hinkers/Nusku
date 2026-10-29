@@ -158,7 +158,8 @@ in_fix() {
 
 # --- apps_ask: the picker, driven by a fake gum -----------------------------------------
 # The fake gum answers one call per reply file $GUM_DIR/replies/N (N = call number, from 1) and
-# records that call's arguments to $GUM_DIR/call-N. A reply of ESC makes it exit 130 (Esc pressed).
+# records that call's arguments to $GUM_DIR/call-N. A reply of ESC makes it exit 1 and CTRLC exit
+# 130, as gum 2.0.2 does for Esc and Ctrl+C; a call with no reply file acts like Esc.
 # A multi-line reply is what a --no-limit checklist prints (one selected label per line).
 
 fake_gum() {
@@ -170,8 +171,8 @@ n=$(( $(cat "$GUM_DIR/n" 2>/dev/null || echo 0) + 1 ))
 echo "$n" >"$GUM_DIR/n"
 printf '%s\n' "$@" >"$GUM_DIR/call-$n"
 reply="$GUM_DIR/replies/$n"
-[ -f "$reply" ] || exit 130
-if [ "$(cat "$reply")" = ESC ]; then exit 130; fi
+[ -f "$reply" ] || exit 1
+case "$(cat "$reply")" in ESC) exit 1 ;; CTRLC) exit 130 ;; esac
 cat "$reply"
 GUM
     chmod +x "$BATS_TEST_TMPDIR/bin/gum"
@@ -182,10 +183,11 @@ GUM
     done
 }
 
-# Run apps_ask (real catalogue) after SETUP, then print APPS and LANGS.
+# Run apps_ask (real catalogue) after SETUP, then print APPS and LANGS. Its stderr goes to
+# $BATS_TEST_TMPDIR/ask.err.
 ask() {
-    PATH="$BATS_TEST_TMPDIR/bin:$PATH" bash -c \
-        'source lib/log.sh; source lib/answers.sh; source lib/apps.sh; '"$1"'; apps_ask >/dev/null 2>&1; echo "APPS=$(answers_get APPS)"; echo "LANGS=$(answers_get LANGS)"'
+    ASK_ERR="$BATS_TEST_TMPDIR/ask.err" PATH="$BATS_TEST_TMPDIR/bin:$PATH" bash -c \
+        'source lib/log.sh; source lib/answers.sh; source lib/apps.sh; '"$1"'; apps_ask >/dev/null 2>"$ASK_ERR"; echo "APPS=$(answers_get APPS)"; echo "LANGS=$(answers_get LANGS)"'
 }
 
 @test "fresh picker defaults to the starred apps" {
@@ -231,6 +233,38 @@ ask() {
     run ask ':'
     [ "$status" -eq 0 ]
     [ "${lines[0]}" = "APPS=neovim gh claude-code firefox discord obsidian spotify vlc" ]
+}
+
+@test "Esc in the group menu means Done" {
+    fake_gum ESC
+    run ask 'answers_set APPS gimp'
+    [ "$status" -eq 0 ]
+    [ "${lines[0]}" = "APPS=gimp" ]
+}
+
+@test "Ctrl+C in the group menu cancels the install" {
+    fake_gum CTRLC
+    run ask ':'
+    [ "$status" -eq 1 ]
+    grep -qx Cancelled "$BATS_TEST_TMPDIR/ask.err"
+    [[ "$output" != *APPS=* ]]
+}
+
+@test "Ctrl+C in a group checklist cancels the install" {
+    fake_gum 'Media (2/4)' CTRLC Done
+    run ask ':'
+    [ "$status" -eq 1 ]
+    grep -qx Cancelled "$BATS_TEST_TMPDIR/ask.err"
+    [[ "$output" != *APPS=* ]]
+    [ ! -e "$GUM_DIR/call-3" ]
+}
+
+@test "Ctrl+C in the language checklist cancels the install" {
+    fake_gum 'Dev (3/6)' ESC CTRLC Done
+    run ask ':'
+    [ "$status" -eq 1 ]
+    grep -qx Cancelled "$BATS_TEST_TMPDIR/ask.err"
+    [ ! -e "$GUM_DIR/call-4" ]
 }
 
 @test "re-asking starts from saved picks" {
@@ -286,7 +320,7 @@ ask() {
 }
 
 @test "ticking None clears the languages" {
-    fake_gum 'Dev (3/6)' ESC None Done
+    fake_gum 'Dev (3/6)' ESC $'None\nPython' Done
     run ask 'answers_set LANGS "python rust"'
     [ "$status" -eq 0 ]
     [ "${lines[1]}" = "LANGS=" ]
@@ -416,7 +450,8 @@ ask() {
 
 # --- Setup hooks ----------------------------------------------------------------------
 # sudo and the user-level tools log their calls to $CALLS; sudo fails when its arguments
-# contain $SUDO_FAIL.
+# contain $SUDO_FAIL. systemctl reports only the SSH unit named in $SSH_ON as enabled/active;
+# xdg-mime query prints $PDF_DEFAULT.
 hook_stubs() {
     STUBS="$BATS_TEST_TMPDIR/stubs"
     CALLS="$BATS_TEST_TMPDIR/calls"
@@ -429,17 +464,18 @@ case "$*" in *"${SUDO_FAIL:-@@none@@}"*) exit 1 ;; esac
 exit 0
 STUB
     for t in xdg-mime rustup; do
-        printf '#!/bin/sh\necho "%s $*" >>"$CALLS"\n[ "$*" = "default" ] && printf "%%s" "${RUSTUP_DEFAULT:-}"\nexit 0\n' "$t" >"$STUBS/$t"
+        printf '#!/bin/sh\necho "%s $*" >>"$CALLS"\n[ "$*" = "default" ] && printf "%%s" "${RUSTUP_DEFAULT:-}"\n[ "$1" = "query" ] && printf "%%s" "${PDF_DEFAULT:-}"\nexit 0\n' "$t" >"$STUBS/$t"
     done
     printf '#!/bin/sh\necho "id $*" >>"$CALLS"\necho "${ID_GROUPS:-wheel}"\n' >"$STUBS/id"
     printf '#!/bin/sh\nexit "${FINDMNT_RC:-1}"\n' >"$STUBS/findmnt"
-    printf '#!/bin/sh\necho "systemctl $*" >>"$CALLS"\ncase "$*" in *sshd.service*) [ -n "${SSHD_ON:-}" ] || exit 1 ;; esac\nexit 0\n' >"$STUBS/systemctl"
+    printf '#!/bin/sh\necho "systemctl $*" >>"$CALLS"\ncase "$*" in *ssh*) case "$*" in *"${SSH_ON:-@@none@@}"*) exit 0 ;; esac; exit 1 ;; esac\nexit 0\n' >"$STUBS/systemctl"
     chmod +x "$STUBS"/*
 }
 
 in_hooks() {
     NUSKU_ETC="$BATS_TEST_TMPDIR/etc" NUSKU_BOOT="$BATS_TEST_TMPDIR/boot" USER=tester \
-        PATH="$STUBS:$PATH" CALLS="$CALLS" in_sub "source lib/packages.sh; $1"
+        HOME="$BATS_TEST_TMPDIR/home" PATH="$STUBS:$PATH" CALLS="$CALLS" \
+        in_sub "source lib/packages.sh; source lib/backup.sh; source lib/dotfiles.sh; $1"
 }
 
 @test "hooks run only for selected apps" {
@@ -459,12 +495,21 @@ in_hooks() {
     [[ "$output" == *"You are in the docker group: that is root-equivalent. Log out and back in to use docker without sudo."* ]]
 }
 
-@test "docker hook skips usermod when already in the group" {
+@test "docker hook skips usermod and the note when already in the group" {
     hook_stubs
-    ID_GROUPS="wheel docker" run in_hooks "answers_set APPS docker; apps_run_hooks"
+    ID_GROUPS="wheel docker" run in_hooks "answers_set APPS docker; apps_run_hooks; apps_summary_notes"
     [ "$status" -eq 0 ]
     grep -q 'sudo systemctl enable docker.service' "$CALLS"
     ! grep -q usermod "$CALLS" || false
+    [[ "$output" != *"Notes:"* ]]
+}
+
+@test "docker hook leaves no note when usermod fails" {
+    hook_stubs
+    SUDO_FAIL=usermod run in_hooks "answers_set APPS docker; apps_run_hooks; apps_summary_notes; printf 'fail=[%s]\n' \"\${NUSKU_APP_FAILURES[*]}\""
+    [ "$status" -eq 0 ]
+    [[ "$output" != *"Notes:"* ]]
+    [[ "$output" == *"fail=[Docker + Compose: setup failed]"* ]]
 }
 
 @test "summary prints no notes when there are none" {
@@ -499,10 +544,20 @@ in_hooks() {
 
 @test "ufw hook keeps SSH open when sshd is enabled" {
     hook_stubs
-    SSHD_ON=1 run in_hooks "answers_set APPS ufw; apps_run_hooks"
+    SSH_ON=sshd.service run in_hooks "answers_set APPS ufw; apps_run_hooks"
     [ "$status" -eq 0 ]
     grep -q 'sudo ufw allow 22/tcp comment SSH' "$CALLS"
     [ "$(grep -n 'ufw allow 22/tcp' "$CALLS" | cut -d: -f1)" -lt "$(grep -n 'ufw --force enable' "$CALLS" | cut -d: -f1)" ]
+}
+
+@test "ufw hook keeps SSH open when only an SSH socket is enabled" {
+    local unit
+    for unit in sshd.socket ssh.socket; do
+        hook_stubs
+        SSH_ON="$unit" run in_hooks "answers_set APPS ufw; apps_run_hooks"
+        [ "$status" -eq 0 ]
+        grep -q 'sudo ufw allow 22/tcp comment SSH' "$CALLS" || { echo "no SSH rule for $unit"; false; }
+    done
 }
 
 @test "ufw hook adds no SSH rule when sshd is off" {
@@ -531,18 +586,44 @@ in_hooks() {
 @test "zathura hook makes it the PDF viewer, as the user" {
     hook_stubs
     run in_hooks "answers_set APPS zathura; apps_run_hooks"
+    grep -q '^xdg-mime query default application/pdf' "$CALLS"
     grep -q '^xdg-mime default org.pwmt.zathura.desktop application/pdf' "$CALLS"
     ! grep -q 'sudo xdg-mime' "$CALLS" || false
 }
 
-@test "snapper hook skips when the root config exists" {
+@test "zathura hook keeps an existing PDF default" {
     hook_stubs
-    mkdir -p "$BATS_TEST_TMPDIR/etc/snapper/configs"
+    PDF_DEFAULT=org.gnome.Evince.desktop run in_hooks "answers_set APPS zathura; apps_run_hooks"
+    [ "$status" -eq 0 ]
+    grep -q '^xdg-mime query default application/pdf' "$CALLS"
+    ! grep -q '^xdg-mime default' "$CALLS" || false
+}
+
+@test "snapper hook with an existing root config still enables the timers and grub" {
+    hook_stubs
+    mkdir -p "$BATS_TEST_TMPDIR/etc/snapper/configs" "$BATS_TEST_TMPDIR/boot/grub"
     : >"$BATS_TEST_TMPDIR/etc/snapper/configs/root"
-    NUSKU_ROOT_FSTYPE=btrfs run in_hooks "answers_set APPS snapper; apps_run_hooks"
+    : >"$BATS_TEST_TMPDIR/boot/grub/grub.cfg"
+    FINDMNT_RC=0 NUSKU_ROOT_FSTYPE=btrfs run in_hooks "answers_set APPS snapper; apps_run_hooks; printf 'fail=[%s]\n' \"\${NUSKU_APP_FAILURES[*]}\""
     [ "$status" -eq 0 ]
     [[ "$output" == *"already"* ]]
-    [ ! -s "$CALLS" ]
+    [[ "$output" == *"fail=[]"* ]]
+    local want=(
+        'sudo systemctl enable snapper-timeline.timer snapper-cleanup.timer grub-btrfsd.service'
+        "sudo grub-mkconfig -o $BATS_TEST_TMPDIR/boot/grub/grub.cfg"
+    )
+    mapfile -t got <"$CALLS"
+    [ "${got[*]}" = "${want[*]}" ] || { printf '%s\n' "${got[@]}"; false; }
+}
+
+@test "snapper hook stops mid-dance when create-config fails" {
+    hook_stubs
+    SUDO_FAIL=create-config FINDMNT_RC=0 NUSKU_ROOT_FSTYPE=btrfs run in_hooks "answers_set APPS snapper; apps_hook_snapper; echo \"rc=\$?\""
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"rc=1"* ]]
+    grep -q 'sudo snapper -c root create-config /' "$CALLS"
+    ! grep -q 'btrfs subvolume delete' "$CALLS" || false
+    ! grep -q 'systemctl enable' "$CALLS" || false
 }
 
 @test "snapper hook does the umount dance when /.snapshots is mounted" {
@@ -559,7 +640,7 @@ in_hooks() {
         'sudo mkdir /.snapshots'
         'sudo mount -a'
         'sudo systemctl enable snapper-timeline.timer snapper-cleanup.timer grub-btrfsd.service'
-        'sudo grub-mkconfig -o /boot/grub/grub.cfg'
+        "sudo grub-mkconfig -o $BATS_TEST_TMPDIR/boot/grub/grub.cfg"
     )
     mapfile -t got <"$CALLS"
     [ "${got[*]}" = "${want[*]}" ] || { printf '%s\n' "${got[@]}"; false; }
@@ -577,9 +658,24 @@ in_hooks() {
 
 @test "snapper hook does nothing on ext4" {
     hook_stubs
-    NUSKU_ROOT_FSTYPE=ext4 run in_hooks "answers_set APPS snapper; apps_run_hooks"
+    NUSKU_ROOT_FSTYPE=ext4 run in_hooks "answers_set APPS snapper; apps_hook_snapper"
     [ "$status" -eq 0 ]
     [ ! -s "$CALLS" ]
+}
+
+@test "snapper picked on a non-btrfs root is skipped with a summary note" {
+    hook_stubs
+    NUSKU_ROOT_FSTYPE=ext4 run in_hooks "answers_set APPS snapper; apps_run_hooks; apps_summary_notes"
+    [ "$status" -eq 0 ]
+    [ ! -s "$CALLS" ]
+    [[ "$output" == *"Notes:"*"Snapper was skipped: / is not btrfs."* ]]
+}
+
+@test "no btrfs note when snapper is not picked" {
+    hook_stubs
+    NUSKU_ROOT_FSTYPE=ext4 run in_hooks "answers_set APPS gimp; apps_run_hooks; apps_summary_notes"
+    [ "$status" -eq 0 ]
+    [[ "$output" != *"btrfs"* ]]
 }
 
 @test "a failing hook is recorded and later hooks still run" {
@@ -673,6 +769,33 @@ nvim_stubs() {
     grep -qx "nvim --headless +lua require('nusku.sync').run() +cquit 2" "$CALLS"
     ! grep -q "stdin is a tty" "$CALLS" || false
     [[ "$output" == *"fail=[]"* ]]
+}
+
+@test "neovim hook links ~/.config/nvim, backing up what was there" {
+    nvim_stubs
+    mkdir -p "$BATS_TEST_TMPDIR/home/.config/nvim"
+    echo mine >"$BATS_TEST_TMPDIR/home/.config/nvim/init.lua"
+    run in_hooks "answers_set APPS neovim; answers_set LANGS ''; apps_run_hooks"
+    [ "$status" -eq 0 ]
+    [ "$(readlink "$BATS_TEST_TMPDIR/home/.config/nvim")" = "$PWD/config/nvim" ]
+    run grep -rlx mine "$XDG_STATE_HOME/nusku"
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"/.config/nvim/init.lua" ]]
+}
+
+@test "without neovim picked ~/.config/nvim is left alone" {
+    nvim_stubs
+    mkdir -p "$BATS_TEST_TMPDIR/home/.config/nvim"
+    echo mine >"$BATS_TEST_TMPDIR/home/.config/nvim/init.lua"
+    run in_hooks "answers_set APPS gimp; answers_set LANGS python; apps_run_hooks"
+    [ "$status" -eq 0 ]
+    [ ! -L "$BATS_TEST_TMPDIR/home/.config/nvim" ]
+    [ "$(cat "$BATS_TEST_TMPDIR/home/.config/nvim/init.lua")" = mine ]
+    ! grep -q '^nvim ' "$CALLS" || false
+}
+
+@test "the dotfile manifest does not link ~/.config/nvim" {
+    ! grep -q 'config/nvim' config/links.txt || false
 }
 
 @test "neovim hook fails and is recorded when the sync exits non-zero" {

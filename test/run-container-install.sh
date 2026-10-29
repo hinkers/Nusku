@@ -143,6 +143,8 @@ fi
 out="$(Hyprland --verify-config 2>&1)"
 rc=$?
 printf "%s\n" "$out" | grep -v DEBUG
+# Older Hyprland prints "Using lua config found at <path>"; Hyprland 0.57 prints "Regular config
+# at <path>" instead. Either way the path must still be hyprland.lua, never hyprland.conf.
 if [ "$rc" -eq 0 ] && printf "%s\n" "$out" | grep -q "^config ok" &&
     printf "%s\n" "$out" | grep -Eq "(Using lua config found|Regular config) at $HOME/.config/hypr/hyprland.lua"; then
     pass "Hyprland --verify-config: Lua config ok"

@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Optional app and language catalogue (packages/apps.list), parsed with awk, never sourced. Sourced, not executed.
-# Needs lib/log.sh (die) and lib/answers.sh (answers_get).
+# Needs lib/log.sh (die) and lib/answers.sh (answers_get); the install and hook functions also
+# use lib/packages.sh (pkg_*) and lib/dotfiles.sh (link_file).
 
 : "${NUSKU_APPS_LIST:=${NUSKU_ROOT:-.}/packages/apps.list}"
 
@@ -105,6 +106,12 @@ _apps_count() {
     printf '%s/%s' "$n" "$t"
 }
 
+# _apps_gum_status STATUS: gum exits 1 on Esc (handled by the caller) and 130 on Ctrl+C, which
+# cancels the whole install.
+_apps_gum_status() {
+    [ "$1" -ne 130 ] || die "Cancelled"
+}
+
 # _apps_pick_group GROUP: checklist over one group. Esc changes nothing; an empty reply or a
 # ticked "None" clears the group.
 _apps_pick_group() {
@@ -116,7 +123,10 @@ _apps_pick_group() {
         case "$_APPS_SEL" in *" $id "*) pre="${pre:+$pre,}${lines[-1]}" ;; esac
     done
     out="$(gum choose --no-limit --header "$(apps_group_label "$g") — space toggles, ctrl+a selects all, enter confirms" \
-        --selected "$pre" None "${lines[@]}")" || return 0
+        --selected "$pre" None "${lines[@]}")" || {
+        _apps_gum_status "$?"
+        return 0
+    }
     while IFS= read -r line; do
         for id in "${ids[@]}"; do
             [ "$(_apps_pick_label "$id")" = "$line" ] && sel="$sel$id "
@@ -144,7 +154,10 @@ _apps_pick_langs() {
         case "$_APPS_LANGS" in *" $id "*) pre="${pre:+$pre,}${labels[-1]}" ;; esac
     done
     out="$(gum choose --no-limit --header "Languages — runtimes, tools and Neovim support" \
-        --selected "$pre" None "${labels[@]}")" || return 0
+        --selected "$pre" None "${labels[@]}")" || {
+        _apps_gum_status "$?"
+        return 0
+    }
     while IFS= read -r line; do
         for id in "${ids[@]}"; do
             [ "$(apps_label "$id")" = "$line" ] && sel="$sel$id "
@@ -175,7 +188,10 @@ apps_ask() {
             menu+=("$(apps_group_label "$g") ($(_apps_count "$g"))")
         done
         menu+=("Done")
-        choice="$(gum choose --header "$menu_hdr" "${menu[@]}")" || break
+        choice="$(gum choose --header "$menu_hdr" "${menu[@]}")" || {
+            _apps_gum_status "$?"
+            break
+        }
         [ "$choice" != "Done" ] || break
         for g in $(apps_groups); do
             label="$(apps_group_label "$g") ($(_apps_count "$g"))"
@@ -394,9 +410,26 @@ _apps_join_group() {
 }
 
 apps_hook_docker() {
+    local user="${USER:-$(id -un)}"
     run_soft sudo systemctl enable docker.service || return 1
+    # The note is only for a run that actually adds the user.
+    if _apps_user_in_group "$user" docker; then
+        log_info "$user is already in the docker group"
+        return 0
+    fi
     _apps_join_group docker || return 1
     NUSKU_APP_NOTES+=("You are in the docker group: that is root-equivalent. Log out and back in to use docker without sudo.")
+}
+
+# _apps_ssh_on: status 0 when the SSH server is enabled or running (service or socket-activated).
+_apps_ssh_on() {
+    local u
+    for u in sshd.service sshd.socket ssh.socket; do
+        if systemctl is-enabled "$u" >/dev/null 2>&1 || systemctl is-active "$u" >/dev/null 2>&1; then
+            return 0
+        fi
+    done
+    return 1
 }
 
 apps_hook_ufw() {
@@ -408,7 +441,7 @@ apps_hook_ufw() {
             run_soft sudo ufw allow 53317/udp comment LocalSend || return 1
             ;;
     esac
-    if systemctl is-enabled sshd.service >/dev/null 2>&1 || systemctl is-active sshd.service >/dev/null 2>&1; then
+    if _apps_ssh_on; then
         log_info "sshd is enabled: allowing SSH (22/tcp) through UFW"
         run_soft sudo ufw allow 22/tcp comment SSH || return 1
     fi
@@ -425,12 +458,11 @@ apps_hook_gamemode() {
 }
 
 apps_hook_snapper() {
+    local boot="${NUSKU_BOOT:-/boot}"
     apps_root_is_btrfs || return 0
     if [ -e "${NUSKU_ETC:-/etc}/snapper/configs/root" ]; then
-        log_info "Snapper is already configured for /; skipping"
-        return 0
-    fi
-    if findmnt -n /.snapshots >/dev/null 2>&1; then
+        log_info "Snapper is already configured for /; not creating it again"
+    elif findmnt -n /.snapshots >/dev/null 2>&1; then
         # archinstall mounts its own @snapshots there; snapper wants to create the subvolume itself.
         run_soft sudo umount /.snapshots || return 1
         run_soft sudo rmdir /.snapshots || return 1
@@ -442,12 +474,17 @@ apps_hook_snapper() {
         run_soft sudo snapper -c root create-config / || return 1
     fi
     run_soft sudo systemctl enable snapper-timeline.timer snapper-cleanup.timer grub-btrfsd.service || return 1
-    if [ -e "${NUSKU_BOOT:-/boot}/grub/grub.cfg" ]; then
-        run_soft sudo grub-mkconfig -o /boot/grub/grub.cfg
+    if [ -e "$boot/grub/grub.cfg" ]; then
+        run_soft sudo grub-mkconfig -o "$boot/grub/grub.cfg"
     fi
 }
 
+# apps_hook_zathura: make Zathura the PDF viewer unless one is already set.
 apps_hook_zathura() {
+    if [ -n "$(xdg-mime query default application/pdf 2>/dev/null)" ]; then
+        log_info "A PDF viewer is already the default; leaving it"
+        return 0
+    fi
     run_soft xdg-mime default org.pwmt.zathura.desktop application/pdf
 }
 
@@ -477,19 +514,27 @@ apps_write_nvim_languages() {
     } >"$1"
 }
 
-# apps_hook_neovim: install LazyVim's plugins (lazy-lock.json revisions), Mason tools and
-# treesitter parsers headless, so the first launch has nothing left to download. Never hangs:
-# "+cquit 2" exits if the +lua command errors outside run() (e.g. not our config), stdin is
-# /dev/null and the whole sync gets 40 minutes (timeout exits 124).
+# apps_hook_neovim: link ~/.config/nvim to the repo's LazyVim config (only Neovim pickers get
+# it; link_file backs up what was there), then install LazyVim's plugins (lazy-lock.json
+# revisions), Mason tools and treesitter parsers headless, so the first launch has nothing left
+# to download. Never hangs: "+cquit 2" exits if the +lua command errors outside run() (e.g.
+# not our config), stdin is /dev/null and the whole sync gets 40 minutes (timeout exits 124).
 apps_hook_neovim() {
+    link_file "${NUSKU_ROOT:-.}/config/nvim" "$HOME/.config/nvim"
     apps_write_nvim_languages "${NUSKU_CONFIG_DIR:-${XDG_CONFIG_HOME:-$HOME/.config}/nusku}/nvim-languages.lua" || return 1
     run_soft timeout 40m nvim --headless "+lua require('nusku.sync').run()" "+cquit 2" </dev/null
 }
 
 # apps_run_hooks: run apps_hook_<id> for each selected app (catalogue order), then each selected
-# language. A failing hook is recorded and the rest still run.
+# language. A failing hook is recorded and the rest still run. A picked btrfs-only app on another
+# filesystem gets a summary note instead.
 apps_run_hooks() {
     local id fn sel
+    for id in $(answers_get APPS); do
+        if apps_has_flag "$id" btrfs && ! apps_root_is_btrfs; then
+            NUSKU_APP_NOTES+=("$(apps_label "$id") was skipped: / is not btrfs.")
+        fi
+    done
     sel=" $(_apps_selected | tr '\n' ' ') "
     while IFS= read -r id; do
         case "$sel" in *" $id "*) ;; *) continue ;; esac
