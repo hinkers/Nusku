@@ -31,20 +31,24 @@ The installer asks which extra apps to install, group by group (a `None` item cl
 | Gaming | Steam, Lutris, Heroic, GameMode, MangoHud, ProtonUp-Qt, Wine (multilib is enabled when needed) |
 | System tools | Yazi, Flatpak, Snapper (btrfs roots only), GParted, UFW firewall |
 
-Then pick programming languages: Python, PHP, GDScript, JavaScript/TypeScript, Rust, Go, C/C++, C#, Java, Lua. Each installs its runtime and package manager; the Neovim language server, formatter and parser come from LazyVim.
+The language picker opens right after the Dev group's checklist: Python, PHP, GDScript, JavaScript/TypeScript, Rust, Go, C/C++, C#, Java, Lua. Each installs its runtime and package manager; the Neovim language server, formatter and parser come from LazyVim. Esc leaves a checklist unchanged; Ctrl+C cancels the install.
 
 ```bash
 ./install.sh --apps        # re-open only the app and language picker, starting from your saved picks
 ./install.sh --reconfigure # ask everything again, with the picker starting from the ★ defaults
 ```
 
+Unticking an app later does not uninstall it; remove it with `pacman -Rns` (or `flatpak uninstall`) yourself.
+
+In an answers file (`--answers FILE`, or the saved `~/.config/nusku/answers`), `APPS=` and `LANGS=` hold space-separated ids from `packages/apps.list`, for example `APPS=neovim gh docker` and `LANGS=python go`. Leave them empty to install no optional apps or languages.
+
 Apps from the AUR or Flathub are optional: if one fails to install, the rest carry on and the summary lists it under "Not installed (see the log)". Setup notes appear under "Notes".
 
 ### Neovim
 
-`~/.config/nvim` is [LazyVim](https://www.lazyvim.org/) in Catppuccin Mocha with your accent colour. The installer syncs plugins, Mason tools and Treesitter parsers headless, so the first launch has nothing to download. Language extras follow the languages you picked.
+When Neovim (LazyVim) is picked, `~/.config/nvim` becomes a link to the repo's [LazyVim](https://www.lazyvim.org/) config in Catppuccin Mocha with your accent colour (an existing `~/.config/nvim` is backed up first). Without it, `~/.config/nvim` is left alone. The installer syncs plugins, Mason tools and Treesitter parsers headless, so the first launch has nothing to download. Language extras follow the languages you picked; Python uses basedpyright.
 
-- Plugin versions are pinned in `config/nvim/lazy-lock.json`, and every `install.sh` or `--update` resets your plugins to those versions. To bump them, run `:Lazy update`, copy `~/.local/share/nvim/lazy-lock.json` over `config/nvim/lazy-lock.json` in the repo, and commit it.
+- Plugin versions are pinned in `config/nvim/lazy-lock.json`, and every `install.sh` or `--update` resets your plugins to those versions. lazy.nvim only records the plugins in use, so to bump them: run `./install.sh --apps`, tick every language and let it finish; open Neovim and run `:Lazy update`; then copy `~/.local/share/nvim/lazy-lock.json` over `config/nvim/lazy-lock.json` in the repo and commit it.
 - Extras you add by hand with `:LazyExtras` stay local (`config/nvim/lazyvim.json` is gitignored).
 - GDScript's language server only works while the Godot editor is open.
 - `Super + Shift + E` opens Yazi when it is installed.
@@ -52,7 +56,8 @@ Apps from the AUR or Flathub are optional: if one fails to install, the rest car
 ### Docker and the firewall
 
 - Docker adds you to the `docker` group, which is root-equivalent. Log out and back in to use `docker` without `sudo`.
-- UFW denies incoming traffic by default. When LocalSend is also picked, port 53317 (TCP and UDP) is opened for it. SSH (22/tcp) is allowed automatically if the SSH server is enabled.
+- UFW denies incoming traffic by default. When LocalSend is also picked, port 53317 (TCP and UDP) is opened for it. SSH (22/tcp) is allowed automatically if the SSH server (or its socket) is enabled.
+- Ports published by Docker containers (`docker run -p`) bypass UFW: Docker writes its own firewall rules. Bind them to `127.0.0.1` if they should stay local.
 
 ## Changing the accent
 
