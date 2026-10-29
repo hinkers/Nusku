@@ -1,5 +1,6 @@
 -- Nusku - keybinds. mod is SUPER. Flags: repeating = held key repeats (old binde),
--- locked = also works on the lock screen (old bindl), mouse = drag binds (old bindm).
+-- locked = also works on the lock screen (old bindl), mouse = drag binds (old bindm),
+-- menu = false keeps a bind list-only in the keybind menu.
 -- Every bind goes through B.bind with a description; SUPER + / searches them.
 -- The dispatcher is written as a Lua expression string so the keybind menu can run it.
 
@@ -50,7 +51,7 @@ for _, dir in ipairs({ "left", "right", "up", "down" }) do
 end
 
 -- Resize (repeats while held)
-local held_resize = { repeating = true }
+local held_resize = { repeating = true, menu = false }
 B.bind(key(mod, "CTRL", "left"),  "Resize window narrower", 'hl.dsp.window.resize({ x = -40, y = 0, relative = true })', held_resize)
 B.bind(key(mod, "CTRL", "right"), "Resize window wider",    'hl.dsp.window.resize({ x = 40, y = 0, relative = true })',  held_resize)
 B.bind(key(mod, "CTRL", "up"),    "Resize window shorter",  'hl.dsp.window.resize({ x = 0, y = -40, relative = true })', held_resize)

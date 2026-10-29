@@ -1,0 +1,59 @@
+#!/usr/bin/env bash
+# nusku-menu-keybinds: searchable list of every Hyprland keybind (SUPER + /). Picking a
+# runnable bind runs it; workspace-style groups open a second list for the member.
+# Reads ${XDG_RUNTIME_DIR}/nusku/keybinds.tsv, written by config/hypr/bindlib.lua:
+#   kind<TAB>group<TAB>keys<TAB>desc<TAB>runnable<TAB>expr
+set -euo pipefail
+
+manifest="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}/nusku/keybinds.tsv"
+
+if [ ! -s "$manifest" ]; then
+    notify-send "Keybinds" "Keybind list not ready; reload Hyprland"
+    exit 0
+fi
+
+menu() { rofi -dmenu -i -p "$1" -theme nusku -format i "${@:2}"; }
+
+# The group column is empty for ungrouped binds; tab is whitespace to `read`, so mark it.
+mapfile -t records < <(sed -E 's/^([a-z]+)\t\t/\1\t-\t/' "$manifest")
+
+# Menu entries in manifest order: group members are hidden, their group record stands in.
+entry_kind=() entry_group=() entry_keys=() entry_desc=() entry_run=() entry_expr=()
+width=0
+for rec in "${records[@]}"; do
+    IFS=$'\t' read -r kind group keys desc run expr <<<"$rec"
+    [ "$kind" = bind ] && [ "$group" != - ] && continue
+    entry_kind+=("$kind") entry_group+=("$group") entry_keys+=("$keys")
+    entry_desc+=("$desc") entry_run+=("$run") entry_expr+=("$expr")
+    [ "${#desc}" -gt "$width" ] && width="${#desc}"
+done
+
+lines=""
+for i in "${!entry_desc[@]}"; do
+    lines+="$(printf '%-*s  %s' "$width" "${entry_desc[$i]}" "${entry_keys[$i]}")"$'\n'
+done
+
+pick="$(printf '%s' "$lines" | menu "Keybinds")" || exit 0
+[[ "$pick" =~ ^[0-9]+$ ]] || exit 0
+[ "$pick" -lt "${#entry_kind[@]}" ] || exit 0
+
+if [ "${entry_kind[$pick]}" = group ]; then
+    gid="${entry_group[$pick]}"
+    member_desc=() member_expr=()
+    for rec in "${records[@]}"; do
+        IFS=$'\t' read -r kind group keys desc run expr <<<"$rec"
+        if [ "$kind" = bind ] && [ "$group" = "$gid" ]; then
+            member_desc+=("$desc") member_expr+=("$expr")
+        fi
+    done
+    [ "${#member_desc[@]}" -gt 0 ] || exit 0
+    sub="$(printf '%s\n' "${member_desc[@]}" | menu "${entry_expr[$pick]}")" || exit 0
+    [[ "$sub" =~ ^[0-9]+$ ]] || exit 0
+    [ "$sub" -lt "${#member_expr[@]}" ] || exit 0
+    hyprctl dispatch "${member_expr[$sub]}"
+    exit 0
+fi
+
+[ "${entry_run[$pick]}" = 1 ] || exit 0
+hyprctl dispatch "${entry_expr[$pick]}"
+exit 0

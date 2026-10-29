@@ -49,8 +49,12 @@ SHIFT + Print" ]
     records '$3 == "Print" { print $4 "|" $6 }' | grep -qxF 'Screenshot a region|hl.dsp.exec_cmd("hyprshot -m region -o ~/Pictures/Screenshots")'
 }
 
-@test "mouse and held binds are not runnable" {
+@test "mouse binds and held resizes are list-only, volume is runnable" {
     load_binds
+    [ "$(records '$3 == "SUPER + mouse:273" { print $5 }')" = "0" ]
+    [ "$(records '$3 ~ /mouse_(up|down)/ { print $5 }' | sort -u)" = "0" ]
+    [ "$(records '$3 ~ /CTRL [+] (left|right|up|down)$/ { print $5 }' | sort -u)" = "0" ]
+    [ "$(records '$4 ~ /olume/ { print $5 }' | sort -u)" = "1" ]
     [ "$(records '$3 == "SUPER + mouse:272" { print $5 }')" = "0" ]
     [ "$(records '$3 == "SUPER + CTRL + left" { print $5 }')" = "0" ]
     [ "$(records '$3 == "SUPER + Q" { print $5 }')" = "1" ]

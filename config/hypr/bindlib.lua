@@ -47,7 +47,7 @@ function B.reset()
     end
 end
 
--- B.bind(keys, desc, expr, opts): opts are hl.bind's, plus `group = "<id>"` for the menu.
+-- B.bind(keys, desc, expr, opts): opts are hl.bind's, plus `group = "<id>"` and `menu = false` (list-only) for the menu.
 function B.bind(keys, desc, expr, opts)
     if desc == nil or desc == "" then
         error("bindlib: a description is required for " .. tostring(keys), 2)
@@ -59,9 +59,12 @@ function B.bind(keys, desc, expr, opts)
 
     local bind_opts = { description = desc }
     local group = ""
+    local menu = true
     for k, v in pairs(opts or {}) do
         if k == "group" then
             group = v
+        elseif k == "menu" then
+            menu = v
         else
             bind_opts[k] = v
         end
@@ -69,8 +72,8 @@ function B.bind(keys, desc, expr, opts)
 
     hl.bind(keys, chunk(), bind_opts)
 
-    -- Drag and held (repeating) binds make no sense as a one-off run from the menu.
-    local runnable = (bind_opts.mouse or bind_opts.repeating or keys:lower():find("mouse", 1, true)) and "0" or "1"
+    -- Mouse binds and held resizes (menu = false) make no sense as a one-off run from the menu.
+    local runnable = (menu ~= false and not bind_opts.mouse and not keys:lower():find("mouse", 1, true)) and "1" or "0"
     append("bind", group, keys, desc, runnable, expr)
 end
 
