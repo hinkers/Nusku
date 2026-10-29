@@ -1,5 +1,5 @@
 FROM archlinux:latest
-RUN pacman -Syu --noconfirm bats shellcheck gum jq sudo git base-devel \
+RUN pacman -Syu --noconfirm bats shellcheck gum jq sudo git base-devel neovim \
     && pacman -Scc --noconfirm
 RUN useradd -m -G wheel tester \
     && echo 'tester ALL=(ALL) NOPASSWD:ALL' > /etc/sudoers.d/tester \

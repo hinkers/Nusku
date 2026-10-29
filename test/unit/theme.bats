@@ -214,3 +214,10 @@ make_repo() {
     done
     [ "$n" -ge 5 ]
 }
+
+@test "nvim-accent template renders" {
+    run in_sub "answers_set ACCENT blue; theme_render_all '$PWD'"
+    [ "$status" -eq 0 ]
+    f="$XDG_CONFIG_HOME/nusku/theme/nvim-accent.lua"
+    [ "$(cat "$f")" = "$(printf '%s\n' '-- Generated from theme/palette.conf by nusku-theme; do not edit.' 'return { name = "blue", hex = "#89b4fa" }')" ]
+}

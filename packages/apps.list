@@ -9,7 +9,7 @@
 # btrfs (only offered when / is btrfs). Labels contain no ',' or '|' (gum --selected is comma-separated).
 
 group|dev|Dev
-app|dev|neovim|*|Neovim (LazyVim)|neovim tree-sitter-cli wl-clipboard unzip lazygit fd ripgrep|
+app|dev|neovim|*|Neovim (LazyVim)|neovim tree-sitter-cli wl-clipboard unzip lazygit fd ripgrep nodejs npm|
 app|dev|gh|*|GitHub CLI|github-cli|
 app|dev|claude-code|*|Claude Code|aur:claude-code|
 app|dev|lazygit|-|lazygit|lazygit|

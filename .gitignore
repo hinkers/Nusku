@@ -2,3 +2,4 @@ test/screenshots/
 *.log
 .claude/
 .superpowers/
+config/nvim/lazyvim.json
