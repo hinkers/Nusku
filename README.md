@@ -28,6 +28,7 @@ The installer asks which extra apps to install, group by group (a `None` item cl
 | Everyday | Firefox ★, Discord ★, Obsidian ★, LibreOffice, Thunderbird, Bitwarden (Flatpak), Zathura, LocalSend |
 | Media | Spotify ★, VLC ★, OBS Studio, Audacity |
 | Creative | GIMP, Krita, Inkscape, Kdenlive, Blender |
+| ArtCraft | PhotoCraft, VectorCraft, FilmCraft, LightCraft, PdfCraft, EffectCraft, DesignCraft, FigCraft, WordCraft, SoundCraft, DeckCraft, CADCraft, GridCraft |
 | Gaming | Steam, Lutris, Heroic, GameMode, MangoHud, ProtonUp-Qt, Wine (multilib is enabled when needed) |
 | System tools | Yazi, Flatpak, Snapper (btrfs roots only), GParted, UFW firewall |
 
@@ -52,6 +53,14 @@ When Neovim (LazyVim) is picked, `~/.config/nvim` becomes a link to the repo's [
 - Extras you add by hand with `:LazyExtras` stay local (`config/nvim/lazyvim.json` is gitignored).
 - GDScript's language server only works while the Godot editor is open.
 - `Super + Shift + E` opens Yazi when it is installed.
+
+### ArtCraft
+
+[ArtCraft](https://getartcraft.com/apps) apps are early releases. Each picked app is installed from its latest GitHub release's Arch package (`ai.storyteller.<app>`), checked against the release's `SHA256SUMS.txt`.
+
+- The ArtCraft Launcher is installed automatically when you pick any ArtCraft app. It keeps the apps (and itself) up to date; Nusku never updates ArtCraft itself, and an app that is already installed is skipped on later runs.
+- The launcher starts hidden in the tray when you log in, so it can check for updates. To stop that, untick "Start when I log in" in the launcher.
+- An app already installed from the AUR (`<app>`, `<app>-bin` or `<app>-git`) is left alone; the summary notes that the launcher won't update it.
 
 ### Docker and the firewall
 
@@ -88,7 +97,7 @@ With a Lua config, `hyprctl dispatch` takes `hl.dsp.*` expressions (e.g. `hyprct
 
 ## Keybinds
 
-`Super` is the main modifier.
+`Super` is the main modifier. Press `Super + /` to search every keybind: type what you want (for example "screenshot"), and Enter runs it.
 
 | Keys | Action |
 | --- | --- |
@@ -98,6 +107,7 @@ With a Lua config, `hyprctl dispatch` takes `hl.dsp.*` expressions (e.g. `hyprct
 | Super + V | Clipboard history |
 | Super + W | Wallpaper picker |
 | Super + Escape | Power menu |
+| Super + / | Search keybinds |
 | Super + N | Notification centre |
 | Super + L | Lock screen |
 | Super + Q | Close window |

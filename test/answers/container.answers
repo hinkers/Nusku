@@ -2,5 +2,5 @@ GPU=vm
 AUR_HELPER=paru
 ACCENT=blue
 TEST_AUTOLOGIN=0
-APPS=neovim gh lazygit yazi zathura docker
+APPS=neovim gh lazygit yazi zathura docker photocraft
 LANGS=lua go

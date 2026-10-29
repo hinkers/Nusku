@@ -76,6 +76,7 @@ _artcraft_one() {
         NUSKU_APP_NOTES+=("$label is installed from the AUR ($foreign); the ArtCraft Launcher won't update it.")
         return 0
     fi
+    log_info "Downloading $label from $NUSKU_ARTCRAFT_BASE/$repo/releases/latest/download"
     tmp="$(mktemp -d)"
     if pkg="$(artcraft_fetch "$repo" "$tmp" 2>"$tmp/err")"; then
         if run_soft sudo pacman -U --noconfirm --needed "$pkg"; then

@@ -133,9 +133,22 @@ printf "%s\n" "${NUSKU_APP_NOTES[@]}" "${NUSKU_APP_FAILURES[@]}"'
 }
 
 @test "a failed download records exactly 'download failed', not curl's message" {
-    run in_art 'artcraft_install_soft "artcraft photocraft photocraft"; printf "%s\n" "${NUSKU_APP_FAILURES[@]}"'
+    run in_art 'artcraft_install_soft "artcraft photocraft photocraft" 2>/dev/null; printf "%s\n" "${NUSKU_APP_FAILURES[@]}"'
     [ "$status" -eq 0 ]
     [ "$output" = "PhotoCraft: download failed" ]
+}
+
+@test "a download is logged with its release URL; an installed package logs none" {
+    release photocraft
+    run in_art 'artcraft_install_soft "artcraft photocraft photocraft"'
+    [ "$status" -eq 0 ]
+    grep -q 'Downloading PhotoCraft from http://stub/photocraft/releases/latest/download' "$XDG_STATE_HOME"/nusku/install-*.log
+    rm -f "$XDG_STATE_HOME"/nusku/install-*.log
+    echo ai.storyteller.photocraft >"$INSTALLED"
+    run in_art 'artcraft_install_soft "artcraft photocraft photocraft"'
+    [ "$status" -eq 0 ]
+    ! grep -q 'releases/latest/download' "$XDG_STATE_HOME"/nusku/install-*.log || false
+    grep -q 'PhotoCraft is already installed' "$XDG_STATE_HOME"/nusku/install-*.log
 }
 
 @test "fetch reports download failed when the package itself 404s" {

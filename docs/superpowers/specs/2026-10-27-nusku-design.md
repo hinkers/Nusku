@@ -72,19 +72,19 @@ Each stage is installable and testable on its own. Build in this order.
 - Hyprland keybinds, window rules, animations, multi-monitor handling.
 - Waybar with all modules in §10.
 - Rofi menus: app launcher, power menu, clipboard history, wallpaper picker.
-- Curated wallpapers in the repo (no generator yet).
+- Curated wallpapers in the repo.
 - Hyper-V test VM and test loop (§11).
 
 ### Stage 2 — Optional groups and language picker
 - All groups in §8 except ArtCraft.
 - Language picker (§9).
 
-### Stage 3 — Extras
-- Generated wallpapers (ImageMagick from the palette).
-- Optional larger wallpaper pack download.
+### Stage 3 — ArtCraft and keybind menu
 - ArtCraft group.
-- Oh My Posh as an alternative prompt.
-- Rofi keybind cheatsheet.
+- Rofi keybind menu (searchable, runs the picked bind).
+- Designed in `2026-10-29-nusku-stage3-design.md`, which supersedes the ArtCraft
+  notes in §8. Generated wallpapers, a wallpaper pack download and Oh My Posh
+  were dropped (not wanted).
 
 ## 5. Install flow
 
@@ -214,7 +214,7 @@ selected language, not all at once.
 ## 10. Desktop extras
 
 - **Rofi menus:** app launcher, power menu, clipboard history, wallpaper picker;
-  keybind cheatsheet in Stage 3.
+  keybind menu in Stage 3.
 - **Wallpaper picker:** apply to all monitors or one; the choice persists
   across reboots.
 - **Wallpapers:** high-res (≥4K) images with centred subjects, shown in
@@ -255,7 +255,7 @@ packages/             # package lists per group / language (pacman, aur, other)
 config/               # dotfiles: hypr, waybar, kitty, rofi, swaync, starship, yazi, nvim, ...
 theme/palette.*       # single Catppuccin Mocha palette + accent
 sddm/                 # SDDM theme config
-wallpapers/           # curated set (+ generator script in Stage 3)
+wallpapers/           # curated set
 scripts/              # rofi menus, wallpaper picker, helpers
 test/                 # Hyper-V test loop scripts (PowerShell) and VM setup notes
 docs/                 # design + plans

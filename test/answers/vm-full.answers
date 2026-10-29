@@ -2,5 +2,5 @@ GPU=vm
 AUR_HELPER=paru
 ACCENT=blue
 TEST_AUTOLOGIN=1
-APPS=neovim gh claude-code lazygit docker vscode firefox discord obsidian libreoffice thunderbird bitwarden zathura localsend spotify vlc obs audacity gimp krita inkscape kdenlive blender steam lutris heroic gamemode mangohud protonup wine yazi flatpak snapper gparted ufw
+APPS=neovim gh claude-code lazygit docker vscode firefox discord obsidian libreoffice thunderbird bitwarden zathura localsend spotify vlc obs audacity gimp krita inkscape kdenlive blender steam lutris heroic gamemode mangohud protonup wine yazi flatpak snapper gparted ufw photocraft
 LANGS=python php gdscript js rust go cpp csharp java lua

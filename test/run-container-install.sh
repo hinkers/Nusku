@@ -45,6 +45,7 @@ else
     bad "second install exited non-zero"
 fi
 after="$(backups)"
+run2_log="$(ls -t "$state"/install-*.log | head -n1)"
 
 echo "=== update run (saved answers) ==="
 # Simulate an older install: all of ~/.config/btop linked into the repo.
@@ -187,6 +188,35 @@ if getent group docker | cut -d: -f4 | tr "," "
 else
     bad "docker group: $(getent group docker)"
 fi
+if pacman -Q ai.storyteller.artcraft-launcher ai.storyteller.photocraft; then
+    pass "ArtCraft launcher and PhotoCraft release packages installed"
+else
+    bad "pacman -Q of the ArtCraft release packages failed"
+fi
+if grep -qx "Exec=/usr/bin/artcraft-launcher --hidden" "$HOME/.config/autostart/ai.storyteller.artcraft-launcher.desktop" 2>/dev/null; then
+    pass "ArtCraft Launcher autostart entry written"
+else
+    bad "ArtCraft Launcher autostart entry missing or wrong"
+fi
+if grep -q "releases/latest/download" "$run2_log"; then
+    bad "second run downloaded ArtCraft again: $(grep "releases/latest/download" "$run2_log")"
+elif grep -q "PhotoCraft is already installed" "$run2_log"; then
+    pass "second run skipped the installed ArtCraft packages"
+else
+    bad "second run log has neither an ArtCraft download nor a skip: $run2_log"
+fi
+if [ -x "$HOME/.local/bin/nusku-menu-keybinds" ]; then
+    pass "~/.local/bin/nusku-menu-keybinds exists"
+else
+    bad "~/.local/bin/nusku-menu-keybinds missing"
+fi
+# --verify-config above loaded keybinds.lua, which writes the keybind menu manifest.
+if grep -q "	Screenshot a region	" "$XDG_RUNTIME_DIR/nusku/keybinds.tsv" 2>/dev/null; then
+    pass "keybind manifest lists Screenshot a region"
+else
+    bad "keybind manifest: $(head -n3 "$XDG_RUNTIME_DIR/nusku/keybinds.tsv" 2>&1)"
+fi
+
 if grep -q "Not installed" /tmp/update.log "$state"/install-*.log; then
     bad "an optional app failed: $(grep -h -A8 "Not installed" /tmp/update.log | head -n 12)"
 else

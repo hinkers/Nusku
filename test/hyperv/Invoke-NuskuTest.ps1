@@ -169,6 +169,7 @@ if (-not $snap) {
 if (-not (Test-Path (Join-Path $RepoRoot $Answers))) { Stop-WithError "Answers file '$Answers' not found under the repo root." }
 $Answers = $Answers -replace '\\', '/'
 $HasApps = [bool](Select-String -Path (Join-Path $RepoRoot $Answers) -Pattern '^APPS=' -Quiet)
+$HasArtCraft = [bool](Select-String -Path (Join-Path $RepoRoot $Answers) -Pattern '^APPS=.*\bphotocraft\b' -Quiet)
 New-Item -ItemType Directory -Force $OutDir | Out-Null
 $installFailed = $false
 
@@ -362,6 +363,70 @@ if ($notices.Trim() -eq '0:') { Add-Result 'hyprland notifications' 'PASS' 'none
 elseif ($notices -match '\.conf|0\.57') { Add-Result 'hyprland notifications' 'FAIL' "$notices" }
 else { Add-Result 'hyprland notifications' 'WARN' "$notices" }
 
+# Keybind menu: script linked, SUPER + slash registered (with its description), the
+# manifest written by keybinds.lua in this session, the menu lists it (Rofi stubbed),
+# and a manifest expr runs through hyprctl dispatch like a menu pick would.
+$null = Invoke-Remote 'test -x ~/.local/bin/nusku-menu-keybinds'
+if ($script:RemoteExit -eq 0) { Add-Result 'keybind menu script' 'PASS' '~/.local/bin/nusku-menu-keybinds' }
+else { Add-Result 'keybind menu script' 'FAIL' 'missing' }
+$slash = ((Invoke-Remote ($envPreamble + "`nhyprctl binds -j | jq -c '.[] | select(.key == `"slash`") | {modmask, key, description}'")) -join ' ').Trim()
+if ($slash -match 'Search keybinds') { Add-Result 'bind SUPER + slash' 'PASS' $slash }
+elseif ($slash) { Add-Result 'bind SUPER + slash' 'WARN' "registered, no description: $slash" }
+else { Add-Result 'bind SUPER + slash' 'FAIL' 'not in hyprctl binds' }
+$shotLine = ((Invoke-Remote ($envPreamble + "`ngrep -P '\tScreenshot a region\t' `"`$XDG_RUNTIME_DIR/nusku/keybinds.tsv`"")) -join ' ').Trim()
+if ($script:RemoteExit -eq 0) { Add-Result 'keybind manifest' 'PASS' ($shotLine -replace "`t", ' | ') }
+else { Add-Result 'keybind manifest' 'FAIL' 'no "Screenshot a region" record' }
+$menuOut = Invoke-Remote ($envPreamble + @'
+
+stub=$(mktemp -d)
+printf '#!/bin/sh\ncat > %s/listed\nexit 1\n' "$stub" > "$stub/rofi"
+chmod +x "$stub/rofi"
+PATH="$stub:$PATH" ~/.local/bin/nusku-menu-keybinds
+rc=$?
+grep -E 'Screenshot a region +Print|Search keybinds|Go to workspace' "$stub/listed"
+n=$(wc -l < "$stub/listed")
+rm -rf "$stub"
+echo "lines=$n"
+exit $rc
+'@)
+$menuText = ($menuOut -join ' / ')
+if ($script:RemoteExit -eq 0 -and $menuText -match 'Screenshot a region +Print' -and $menuText -match 'Go to workspace') {
+    Add-Result 'keybind menu lists binds' 'PASS' $menuText
+} else { Add-Result 'keybind menu lists binds' 'FAIL' "exit $($script:RemoteExit): $menuText" }
+$wsOut = Invoke-Remote ($envPreamble + @'
+
+expr=$(awk -F'\t' '$1 == "bind" && $2 == "ws-go" && $4 == "2" { print $6; exit }' "$XDG_RUNTIME_DIR/nusku/keybinds.tsv")
+echo "expr: $expr"
+[ -n "$expr" ] || exit 3
+hyprctl dispatch "$expr"
+rc=$?
+sleep 1
+echo "active: $(hyprctl activeworkspace -j | jq .id)"
+hyprctl dispatch 'hl.dsp.focus({ workspace = 1 })' >/dev/null
+exit $rc
+'@)
+$wsText = ($wsOut -join ' / ')
+if ($script:RemoteExit -eq 0 -and $wsText -match 'active: 2') { Add-Result 'dispatch manifest expr' 'PASS' $wsText }
+else { Add-Result 'dispatch manifest expr' 'FAIL' "exit $($script:RemoteExit): $wsText" }
+
+if ($HasArtCraft) {
+    $pk = (Invoke-Remote 'pacman -Q ai.storyteller.artcraft-launcher ai.storyteller.photocraft') -join ' / '
+    if ($script:RemoteExit -eq 0) { Add-Result 'artcraft packages' 'PASS' $pk }
+    else { Add-Result 'artcraft packages' 'FAIL' "$pk" }
+    $entry = (Invoke-Remote 'grep -x "Exec=/usr/bin/artcraft-launcher --hidden" ~/.config/autostart/ai.storyteller.artcraft-launcher.desktop') -join ' '
+    if ($script:RemoteExit -eq 0) { Add-Result 'artcraft autostart entry' 'PASS' $entry }
+    else { Add-Result 'artcraft autostart entry' 'FAIL' 'missing or no --hidden Exec' }
+    $launcher = ''
+    $deadline = (Get-Date).AddSeconds(30)
+    while ((Get-Date) -lt $deadline) {
+        $launcher = (Invoke-Remote 'pgrep -a -f "[a]rtcraft-launcher"') -join ' / '
+        if ($script:RemoteExit -eq 0) { break }
+        Start-Sleep -Seconds 3
+    }
+    if ($script:RemoteExit -eq 0) { Add-Result 'artcraft launcher running' 'PASS' $launcher }
+    else { Add-Result 'artcraft launcher running' 'FAIL' 'no artcraft-launcher process after login' }
+}
+
 if ($HasApps) {
     $cmds = 'nvim gh claude lazygit docker code firefox discord obsidian libreoffice thunderbird zathura localsend spotify-launcher vlc obs audacity gimp krita inkscape kdenlive blender steam lutris heroic gamemoded mangohud protonup-qt wine yazi flatpak gparted ufw'
     foreach ($c in $cmds.Split(' ')) {
@@ -394,6 +459,22 @@ if ($HasApps) {
         $fl = (Invoke-Remote 'grep -A12 "Not installed" ~/install.out') -join ' / '
         Add-Result 'no optional app failures' 'FAIL' "$fl"
     }
+}
+
+# Re-run the installer once: ArtCraft packages already installed are not downloaded again.
+if ($HasArtCraft) {
+    Write-Step 'Re-running install.sh (ArtCraft must not download again)'
+    $null = Invoke-Remote "cd ~/nusku && NUSKU_NONINTERACTIVE=1 ./install.sh --answers $Answers --no-reboot > ~/install2.out 2>&1"
+    $rerunExit = $script:RemoteExit
+    $rerun = (Invoke-Remote @'
+log=$(ls -t ~/.local/state/nusku/install-*.log | head -1)
+echo "log: $log"
+grep -E 'releases/latest/download|is already installed' "$log"
+'@) -join ' / '
+    if ($rerunExit -ne 0) { Add-Result 'installer re-run' 'FAIL' "exit $rerunExit (see ~/install2.out)" }
+    elseif ($rerun -match 'releases/latest/download') { Add-Result 'installer re-run' 'FAIL' "downloaded again: $rerun" }
+    elseif ($rerun -match 'PhotoCraft is already installed') { Add-Result 'installer re-run' 'PASS' "no ArtCraft download: $rerun" }
+    else { Add-Result 'installer re-run' 'FAIL' "no ArtCraft skip in the log: $rerun" }
 }
 
 $results | Format-Table -AutoSize | Out-String | Write-Host
@@ -430,6 +511,11 @@ Save-Screenshot 'window.png'
 $null = Invoke-Remote ($envPreamble + "`nhyprctl dispatch 'hl.dsp.exec_cmd(`"rofi -show drun`")' >/dev/null")
 Start-Sleep -Seconds 4   # software rendering: give rofi time to map and animate in
 Save-Screenshot 'rofi.png'
+$null = Invoke-Remote 'pkill -x -u "$(id -u)" rofi || true'
+# The keybind menu (SUPER + /), started the way its bind starts it.
+$null = Invoke-Remote ($envPreamble + "`nhyprctl dispatch 'hl.dsp.exec_cmd(`"~/.local/bin/nusku-menu-keybinds`")' >/dev/null")
+Start-Sleep -Seconds 4
+Save-Screenshot 'keybinds.png'
 $null = Invoke-Remote 'pkill -x -u "$(id -u)" rofi || true'
 if ($HasApps) {
     $null = Invoke-Remote @'
