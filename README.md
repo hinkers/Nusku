@@ -5,7 +5,7 @@ Nusku is a Bash installer that turns a fresh Arch Linux install into a themed Hy
 ## Install
 
 ```bash
-git clone https://github.com/<user>/nusku.git && cd nusku && ./install.sh
+git clone https://github.com/hinkers/Nusku.git && cd Nusku && ./install.sh
 ```
 
 ## Updating
