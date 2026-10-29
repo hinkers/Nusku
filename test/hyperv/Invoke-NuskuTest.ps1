@@ -169,7 +169,7 @@ if (-not $snap) {
 if (-not (Test-Path (Join-Path $RepoRoot $Answers))) { Stop-WithError "Answers file '$Answers' not found under the repo root." }
 $Answers = $Answers -replace '\\', '/'
 $HasApps = [bool](Select-String -Path (Join-Path $RepoRoot $Answers) -Pattern '^APPS=' -Quiet)
-$HasPokemon = [bool](Select-String -Path (Join-Path $RepoRoot $Answers) -Pattern '^APPS=.*pokemon' -Quiet)
+$HasPokemon = [bool](Select-String -Path (Join-Path $RepoRoot $Answers) -Pattern '^APPS=.*\bpokemon\b' -Quiet)
 $HasArtCraft = [bool](Select-String -Path (Join-Path $RepoRoot $Answers) -Pattern '^APPS=.*\bphotocraft\b' -Quiet)
 New-Item -ItemType Directory -Force $OutDir | Out-Null
 $installFailed = $false
@@ -416,8 +416,7 @@ if ($HasPokemon) {
     else { Add-Result 'krabby package' 'FAIL' "$kr" }
     # krabby draws sprites with half-block characters (U+2580 / U+2584) and truecolor escapes;
     # the Arch logo uses neither. Byte-wise grep so the guest locale does not matter.
-    $fetch = (Invoke-Remote 'out=$(~/.local/bin/nusku-fetch 2>&1); printf "%s
-" "$out" | LC_ALL=C grep -cP "â[]"') -join ' '
+    $fetch = (Invoke-Remote 'out=$(~/.local/bin/nusku-fetch 2>&1); echo "$out" | LC_ALL=C grep -cP "\xe2\x96[\x80\x84]"') -join ' '
     if ($script:RemoteExit -eq 0 -and [int]$fetch -gt 0) { Add-Result 'nusku-fetch pokemon sprite' 'PASS' "$fetch sprite lines" }
     else { Add-Result 'nusku-fetch pokemon sprite' 'FAIL' "exit $($script:RemoteExit): $fetch" }
 }
