@@ -62,8 +62,8 @@ B.bind(key(mod, "mouse:272"), "Drag to move window",   'hl.dsp.window.drag()',  
 B.bind(key(mod, "mouse:273"), "Drag to resize window", 'hl.dsp.window.resize()', { mouse = true })
 
 -- --- Workspaces -------------------------------------------------------
-B.group("ws-go",   "Go to workspace",          key(mod, "1…0"),          "Workspace")
-B.group("ws-move", "Move window to workspace", key(mod, "SHIFT", "1…0"), "Workspace")
+B.group("ws-go",   "Go to workspace 1–10",          key(mod, "1…0"),          "Workspace")
+B.group("ws-move", "Move window to workspace 1–10", key(mod, "SHIFT", "1…0"), "Workspace")
 for i = 1, 10 do
     local k = tostring(i % 10) -- workspace 10 is on key 0
     B.bind(key(mod, k),          tostring(i), ("hl.dsp.focus({ workspace = %d })"):format(i),       { group = "ws-go" })

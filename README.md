@@ -88,8 +88,11 @@ Hyprland's config is [Lua](https://wiki.hypr.land/Configuring/) (`~/.config/hypr
 ```lua
 hl.monitor({ output = "DP-1", mode = "2560x1440@144", position = "0x0", scale = 1 })
 hl.config({ input = { kb_layout = "us,de", kb_options = "grp:alt_shift_toggle" } })
-hl.bind("SUPER + B", hl.dsp.exec_cmd("firefox"))
+local B = require("bindlib")
+B.bind("SUPER + B", "Firefox", 'hl.dsp.exec_cmd("firefox")')
 ```
+
+Binds made with plain `hl.bind` work but don't show in the keybind menu (SUPER + /).
 
 Upgrading from an older Nusku that used `local.conf`: that file is kept but no longer read. The installer warns if it holds settings; move them into `local.lua` in the syntax above. Log out and back in (or reboot) after updating: the running session still uses the old config.
 

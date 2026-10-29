@@ -62,8 +62,8 @@ SHIFT + Print" ]
 
 @test "workspace binds collapse into groups" {
     load_binds
-    [ "$(records '$1 == "group" && $2 == "ws-go" { print $3 "|" $4 "|" $6 }')" = "SUPER + 1…0|Go to workspace|Workspace" ]
-    [ "$(records '$1 == "group" && $2 == "ws-move" { print $3 "|" $4 "|" $6 }')" = "SUPER + SHIFT + 1…0|Move window to workspace|Workspace" ]
+    [ "$(records '$1 == "group" && $2 == "ws-go" { print $3 "|" $4 "|" $6 }')" = "SUPER + 1…0|Go to workspace 1–10|Workspace" ]
+    [ "$(records '$1 == "group" && $2 == "ws-move" { print $3 "|" $4 "|" $6 }')" = "SUPER + SHIFT + 1…0|Move window to workspace 1–10|Workspace" ]
     [ "$(records '$1 == "bind" && $2 == "ws-go"' | wc -l)" -eq 10 ]
     [ "$(records '$1 == "bind" && $2 == "ws-move"' | wc -l)" -eq 10 ]
     [ "$(records '$2 == "ws-go" && $3 == "SUPER + 0" { print $4 "|" $6 }')" = '10|hl.dsp.focus({ workspace = 10 })' ]
@@ -113,4 +113,15 @@ LUA
     load_binds "$BATS_TEST_TMPDIR/grp.lua"
     [ "$(records '{ print $2 }')" = "g" ]
     [ "$output" = "$(printf 'X\t1\tdescription,locked')" ]
+}
+
+@test "binds from a local module appear in the manifest after keybinds" {
+    cat >"$BATS_TEST_TMPDIR/both.lua" <<'LUA'
+dofile("config/hypr/keybinds.lua")
+local B = require("bindlib")
+B.bind("SUPER + B", "Firefox", 'hl.dsp.exec_cmd("firefox")')
+LUA
+    load_binds "$BATS_TEST_TMPDIR/both.lua"
+    records '$3 == "SUPER + B" { print $4 "|" $5 "|" $6 }' | grep -qxF 'Firefox|1|hl.dsp.exec_cmd("firefox")'
+    records '$3 == "SUPER + slash"' | grep -q .
 }

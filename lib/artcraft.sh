@@ -41,7 +41,7 @@ artcraft_fetch() {
     local repo="$1" dir="$2" url sums line sum file
     url="$NUSKU_ARTCRAFT_BASE/$repo/releases/latest/download"
     sums="$dir/SHA256SUMS.txt"
-    curl -fsSL --retry 2 -o "$sums" "$url/SHA256SUMS.txt" 2>>"${NUSKU_LOG:-/dev/null}" || {
+    curl -fsSL --retry 2 --connect-timeout 30 --speed-time 60 --speed-limit 1024 -o "$sums" "$url/SHA256SUMS.txt" 2>>"${NUSKU_LOG:-/dev/null}" || {
         echo "download failed" >&2
         return 1
     }
@@ -52,7 +52,7 @@ artcraft_fetch() {
     fi
     sum="${line% *}"
     file="${line#* }"
-    curl -fsSL --retry 2 -o "$dir/$file" "$url/$file" 2>>"${NUSKU_LOG:-/dev/null}" || {
+    curl -fsSL --retry 2 --connect-timeout 30 --speed-time 60 --speed-limit 1024 -o "$dir/$file" "$url/$file" 2>>"${NUSKU_LOG:-/dev/null}" || {
         echo "download failed" >&2
         return 1
     }

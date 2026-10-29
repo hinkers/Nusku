@@ -365,7 +365,7 @@ else { Add-Result 'hyprland notifications' 'WARN' "$notices" }
 
 # Keybind menu: script linked, SUPER + slash registered (with its description), the
 # manifest written by keybinds.lua in this session, the menu lists it (Rofi stubbed),
-# and a manifest expr runs through hyprctl dispatch like a menu pick would.
+# and a manifest expr runs through `hyprctl` dispatching like a menu pick would.
 $null = Invoke-Remote 'test -x ~/.local/bin/nusku-menu-keybinds'
 if ($script:RemoteExit -eq 0) { Add-Result 'keybind menu script' 'PASS' '~/.local/bin/nusku-menu-keybinds' }
 else { Add-Result 'keybind menu script' 'FAIL' 'missing' }

@@ -6,6 +6,8 @@ if config_home == nil or config_home == "" then
 end
 
 return {
+    -- the XDG config home itself (autostart entries live in <config>/autostart)
+    config = config_home,
     -- gpu.lua (generated) and local.lua (yours)
     nusku = config_home .. "/nusku",
     -- hypr-colors.lua and hypr-cursor.lua, rendered from theme/palette.conf

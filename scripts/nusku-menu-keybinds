@@ -17,20 +17,39 @@ menu() { rofi -dmenu -i -p "$1" -theme nusku -format i "${@:2}"; }
 # The group column is empty for ungrouped binds; tab is whitespace to `read`, so mark it.
 mapfile -t records < <(sed -E 's/^([a-z]+)\t\t/\1\t-\t/' "$manifest")
 
+# Friendly key names for display only; the manifest and the binds stay raw.
+declare -A key_names=(
+    [slash]="/" [mouse:272]="Left drag" [mouse:273]="Right drag"
+    [mouse_down]="Scroll down" [mouse_up]="Scroll up" [Return]="Enter"
+    [XF86AudioRaiseVolume]="Volume Up key" [XF86AudioLowerVolume]="Volume Down key"
+    [XF86AudioMute]="Mute key" [XF86AudioMicMute]="Mic Mute key"
+    [XF86MonBrightnessUp]="Brightness Up key" [XF86MonBrightnessDown]="Brightness Down key"
+    [XF86AudioPlay]="Play key" [XF86AudioPause]="Pause key"
+    [XF86AudioNext]="Next key" [XF86AudioPrev]="Previous key"
+)
+pretty_keys() {
+    local IFS=' ' tok out=""
+    for tok in $1; do
+        [ "$tok" = "+" ] || tok="${key_names[$tok]:-$tok}"
+        out+="${out:+ }$tok"
+    done
+    printf '%s' "$out"
+}
+
 # Menu entries in manifest order: group members are hidden, their group record stands in.
 entry_kind=() entry_group=() entry_keys=() entry_desc=() entry_run=() entry_expr=()
 width=0
 for rec in "${records[@]}"; do
     IFS=$'\t' read -r kind group keys desc run expr <<<"$rec"
     [ "$kind" = bind ] && [ "$group" != - ] && continue
-    entry_kind+=("$kind") entry_group+=("$group") entry_keys+=("$keys")
+    entry_kind+=("$kind") entry_group+=("$group") entry_keys+=("$(pretty_keys "$keys")")
     entry_desc+=("$desc") entry_run+=("$run") entry_expr+=("$expr")
     [ "${#desc}" -gt "$width" ] && width="${#desc}"
 done
 
 lines=""
 for i in "${!entry_desc[@]}"; do
-    lines+="$(printf '%-*s  %s' "$width" "${entry_desc[$i]}" "${entry_keys[$i]}")"$'\n'
+    lines+="$(printf '%-*s    %s' "$width" "${entry_desc[$i]}" "${entry_keys[$i]}")"$'\n'
 done
 
 pick="$(printf '%s' "$lines" | menu "Keybinds")" || exit 0

@@ -1,5 +1,7 @@
 -- Nusku - session autostart (runs once when Hyprland starts, not on config reloads).
 
+local paths = require("paths")
+
 hl.on("hyprland.start", function()
     hl.exec_cmd("systemctl --user start hyprpolkitagent")
     hl.exec_cmd("hyprpaper")
@@ -13,12 +15,14 @@ hl.on("hyprland.start", function()
     hl.exec_cmd("blueman-applet")
 
     -- The ArtCraft Launcher's own autostart entry (its "start at login" setting): use its Exec only.
-    local f = io.open((os.getenv("HOME") or "") .. "/.config/autostart/ai.storyteller.artcraft-launcher.desktop", "r")
+    local f = io.open(paths.config .. "/autostart/ai.storyteller.artcraft-launcher.desktop", "r")
     if f then
         local text = f:read("*a")
         f:close()
-        local exec = ("\n" .. text):match("\nExec=([^\n]+)")
-        if exec then
+        local body = "\n" .. text
+        local exec = body:match("\nExec=([^\n]+)")
+        local disabled = body:find("\nHidden=true", 1, true) or body:find("\nX-GNOME-Autostart-enabled=false", 1, true)
+        if exec and not disabled then
             hl.exec_cmd(exec)
         end
     end

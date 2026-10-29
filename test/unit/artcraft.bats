@@ -17,7 +17,7 @@ out="" url=""
 while [ $# -gt 0 ]; do
     case "$1" in
         -o) out="$2"; shift ;;
-        --retry) shift ;;
+        --retry | --connect-timeout | --speed-time | --speed-limit) shift ;;
         -*) ;;
         *) url="$1" ;;
     esac
@@ -208,7 +208,7 @@ X-GNOME-Autostart-enabled=true" ]
     mkdir -p "$BATS_TEST_TMPDIR/home/.config/autostart"
     printf '[Desktop Entry]\nName=x\nExec=/usr/bin/artcraft-launcher --hidden\nIcon=y\n' \
         >"$BATS_TEST_TMPDIR/home/.config/$ENTRY_REL"
-    HOME="$BATS_TEST_TMPDIR/home" run nvim --headless -l test/fixtures/hypr-stub.lua config/hypr/autostart.lua
+    HOME="$BATS_TEST_TMPDIR/home" XDG_CONFIG_HOME="$BATS_TEST_TMPDIR/home/.config" run nvim --headless -l test/fixtures/hypr-stub.lua config/hypr/autostart.lua
     [ "$status" -eq 0 ]
     [ "$(grep -c artcraft <<<"$output")" -eq 1 ]
     grep -qxF '/usr/bin/artcraft-launcher --hidden' <<<"$output"
@@ -216,8 +216,50 @@ X-GNOME-Autostart-enabled=true" ]
 
 @test "autostart.lua starts nothing extra without the entry" {
     mkdir -p "$BATS_TEST_TMPDIR/home"
-    HOME="$BATS_TEST_TMPDIR/home" run nvim --headless -l test/fixtures/hypr-stub.lua config/hypr/autostart.lua
+    HOME="$BATS_TEST_TMPDIR/home" XDG_CONFIG_HOME="$BATS_TEST_TMPDIR/home/.config" run nvim --headless -l test/fixtures/hypr-stub.lua config/hypr/autostart.lua
     [ "$status" -eq 0 ]
     ! grep -q artcraft <<<"$output" || false
     grep -qxF 'waybar' <<<"$output"
+}
+
+@test "autostart.lua honours XDG_CONFIG_HOME" {
+    mkdir -p "$BATS_TEST_TMPDIR/xdg/autostart" "$BATS_TEST_TMPDIR/home/.config/autostart"
+    printf '[Desktop Entry]\nExec=/usr/bin/from-xdg\n' >"$BATS_TEST_TMPDIR/xdg/$ENTRY_REL"
+    printf '[Desktop Entry]\nExec=/usr/bin/from-home\n' >"$BATS_TEST_TMPDIR/home/.config/$ENTRY_REL"
+    HOME="$BATS_TEST_TMPDIR/home" XDG_CONFIG_HOME="$BATS_TEST_TMPDIR/xdg" run nvim --headless -l test/fixtures/hypr-stub.lua config/hypr/autostart.lua
+    [ "$status" -eq 0 ]
+    grep -qxF '/usr/bin/from-xdg' <<<"$output"
+    ! grep -q from-home <<<"$output" || false
+}
+
+@test "autostart.lua skips an entry with Hidden=true" {
+    mkdir -p "$BATS_TEST_TMPDIR/home/.config/autostart"
+    printf '[Desktop Entry]\nExec=/usr/bin/artcraft-launcher --hidden\nHidden=true\n' \
+        >"$BATS_TEST_TMPDIR/home/.config/$ENTRY_REL"
+    HOME="$BATS_TEST_TMPDIR/home" XDG_CONFIG_HOME="$BATS_TEST_TMPDIR/home/.config" run nvim --headless -l test/fixtures/hypr-stub.lua config/hypr/autostart.lua
+    [ "$status" -eq 0 ]
+    ! grep -q artcraft <<<"$output" || false
+    grep -qxF 'waybar' <<<"$output"
+}
+
+@test "autostart.lua skips an entry with X-GNOME-Autostart-enabled=false" {
+    mkdir -p "$BATS_TEST_TMPDIR/home/.config/autostart"
+    printf '[Desktop Entry]\nExec=/usr/bin/artcraft-launcher --hidden\nX-GNOME-Autostart-enabled=false\n' \
+        >"$BATS_TEST_TMPDIR/home/.config/$ENTRY_REL"
+    HOME="$BATS_TEST_TMPDIR/home" XDG_CONFIG_HOME="$BATS_TEST_TMPDIR/home/.config" run nvim --headless -l test/fixtures/hypr-stub.lua config/hypr/autostart.lua
+    [ "$status" -eq 0 ]
+    ! grep -q artcraft <<<"$output" || false
+    grep -qxF 'waybar' <<<"$output"
+}
+
+@test "install_soft with a bad checksum records 'checksum mismatch' and never runs pacman -U" {
+    release photocraft 0000000000000000000000000000000000000000000000000000000000000000
+    run in_art 'artcraft_install_soft "artcraft photocraft photocraft" 2>/dev/null; printf "%s\n" "${NUSKU_APP_FAILURES[@]}"'
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"PhotoCraft: checksum mismatch"* ]]
+    ! grep -q 'pacman -U' "$CALLS" || false
+}
+
+@test "curl calls carry connect and stall timeouts" {
+    grep -c -- '--connect-timeout 30 --speed-time 60 --speed-limit 1024' lib/artcraft.sh | grep -qx 2
 }

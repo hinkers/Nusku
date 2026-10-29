@@ -43,6 +43,8 @@ kb_setup() {
         done
         printf 'group\tws-go\tSUPER + 1…0\tGo to workspace\t1\tWorkspace\n'
         printf 'bind\t\tSUPER + Q\tClose window\t1\thl.dsp.window.close()\n'
+        printf 'bind\t\tSUPER + slash\tSearch keybinds\t1\thl.dsp.exec_cmd("x")\n'
+        printf 'bind\t\tXF86AudioMute\tMute\t1\thl.dsp.exec_cmd("m")\n'
     } >"$XDG_RUNTIME_DIR/nusku/keybinds.tsv"
     export HYPR_ARGS="$BATS_TEST_TMPDIR/hypr-args"
     : >"$HYPR_ARGS"
@@ -71,6 +73,10 @@ kb_picks() { echo "$*" >"$ROFI_ARGS.queue"; }
     run scripts/nusku-menu-keybinds
     [ "$status" -eq 0 ]
     grep -E 'Screenshot a region +Print' "$ROFI_ARGS.stdin"
+    grep -E 'Search keybinds +SUPER \+ /$' "$ROFI_ARGS.stdin"
+    grep -E 'Drag to move window +SUPER \+ Left drag$' "$ROFI_ARGS.stdin"
+    grep -E 'Mute +Mute key$' "$ROFI_ARGS.stdin"
+    grep -qE 'Close window {4,}SUPER [+] Q' "$ROFI_ARGS.stdin"
     grep -qF -- '-p Keybinds' "$ROFI_ARGS"
     grep -qF -- '-format i' "$ROFI_ARGS"
 }
