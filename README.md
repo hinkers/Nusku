@@ -85,6 +85,8 @@ Nusku never overwrites these files:
 - `~/.config/nusku/local.lua` — Hyprland settings (monitors, input, extra binds). Loaded last, so it wins.
 - `~/.config/nusku/local.zsh` — your own zsh additions, sourced at the end of `~/.zshrc`.
 
+Built-in 1920×1200 and 1920×1080 laptop screens start at 1.25× scale (Hyprland's auto scale would pick 1.5×); every other screen uses auto. The installer writes that rule to `~/.config/nusku/gpu.lua`; a `hl.monitor` line in `local.lua` overrides it.
+
 Hyprland's config is [Lua](https://wiki.hypr.land/Configuring/) (`~/.config/hypr/hyprland.lua` and the modules next to it). A `local.lua` override looks like this:
 
 ```lua

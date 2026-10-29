@@ -1,5 +1,6 @@
 setup() {
     export XDG_STATE_HOME="$BATS_TEST_TMPDIR" XDG_CONFIG_HOME="$BATS_TEST_TMPDIR/cfg"
+    export NUSKU_DRM_DIR="$BATS_TEST_TMPDIR/drm" # empty: no laptop screen unless a test adds one
     unset NUSKU_LOG NUSKU_STEP NUSKU_NONINTERACTIVE
     STUBS="$BATS_TEST_TMPDIR/stubs"
     mkdir -p "$STUBS"
@@ -257,4 +258,39 @@ STUB
     [[ "$output" == *KEY=* ]]
     grep -qx 'KEY=(a)' "$f"
     [ "$(grep -c 'install -m 644' "$CALLS")" -eq 0 ]
+}
+
+# fake_panel CONNECTOR MODE: a sysfs-style DRM connector whose preferred mode is MODE.
+fake_panel() {
+    mkdir -p "$NUSKU_DRM_DIR/$1"
+    printf '%s\n1280x800\n' "$2" >"$NUSKU_DRM_DIR/$1/modes"
+}
+
+@test "gpu_hypr_lua scales a 1920x1200 laptop screen to 1.25" {
+    fake_panel card1-eDP-1 1920x1200
+    run in_sub "gpu_hypr_lua intel none"
+    [[ "$output" == *'hl.monitor({ output = "eDP-1", mode = "preferred", position = "auto", scale = 1.25 })'* ]]
+    [[ "$output" != *"Nothing to override"* ]]
+}
+
+@test "gpu_hypr_lua scales a 1920x1080 laptop screen on hybrid and nvidia too" {
+    fake_panel card0-eDP-2 1920x1080
+    run in_sub "gpu_hypr_lua hybrid-intel none"
+    [[ "$output" == *'output = "eDP-2"'*'scale = 1.25'* ]]
+    run in_sub "gpu_hypr_lua nvidia none"
+    [[ "$output" == *'output = "eDP-2"'*'scale = 1.25'* ]]
+}
+
+@test "gpu_hypr_lua leaves other laptop screens and external monitors on auto" {
+    fake_panel card1-eDP-1 2880x1800
+    fake_panel card1-DP-1 1920x1080
+    run in_sub "gpu_hypr_lua amd none"
+    [[ "$output" != *"hl.monitor"* ]]
+    [[ "$output" == *"Nothing to override"* ]]
+}
+
+@test "gpu_hypr_lua vm ignores laptop screens" {
+    fake_panel card1-eDP-1 1920x1200
+    run in_sub "gpu_hypr_lua vm kvm"
+    [[ "$output" != *"scale = 1.25"* ]]
 }

@@ -101,9 +101,11 @@ gpu_hypr_lua() {
             echo 'hl.env("LIBVA_DRIVER_NAME", "nvidia")'
             echo 'hl.env("__GLX_VENDOR_LIBRARY_NAME", "nvidia")'
             echo 'hl.env("NVD_BACKEND", "direct")'
+            gpu_panel_lua || true
             ;;
         hybrid-*)
             echo "-- Hybrid: Hyprland runs on the integrated GPU; use prime-run for apps."
+            gpu_panel_lua || true
             ;;
         vm)
             # Virtual displays report a 0x0 mm size and Hyprland's auto scale then picks 2.
@@ -115,9 +117,31 @@ gpu_hypr_lua() {
             fi
             ;;
         *)
-            echo "-- Nothing to override for this GPU."
+            gpu_panel_lua || echo "-- Nothing to override for this GPU."
             ;;
     esac
+}
+
+# gpu_panel_lua: a 1.25x scale rule for each built-in 1920x1200 or 1920x1080 laptop screen.
+# Hyprland's auto scale picks 1.5 there, which leaves only 1280x800 of room. Larger panels
+# keep auto. Reads each eDP connector's preferred mode (first line of its sysfs "modes").
+# Returns 1 when no rule was printed.
+gpu_panel_lua() {
+    local dir="${NUSKU_DRM_DIR:-/sys/class/drm}" conn name mode found=1
+    for conn in "$dir"/card*-eDP-*; do
+        [ -r "$conn/modes" ] || continue
+        mode="$(head -n1 "$conn/modes")"
+        name="${conn##*/}"
+        name="${name#card*-}" # card1-eDP-1 -> eDP-1
+        case "$mode" in
+            1920x1200 | 1920x1080)
+                [ "$found" -eq 1 ] && echo "-- Laptop screen: auto scale picks 1.5 here; 1.25 fits more. Override in local.lua."
+                printf 'hl.monitor({ output = "%s", mode = "preferred", position = "auto", scale = 1.25 })\n' "$name"
+                found=0
+                ;;
+        esac
+    done
+    return "$found"
 }
 
 # _gpu_edit_etc FILE KEY_RE FUNC ARGS...: apply a pure edit function to a temp copy, check the
