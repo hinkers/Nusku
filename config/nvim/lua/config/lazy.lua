@@ -8,7 +8,9 @@ if not (vim.uv or vim.loop).fs_stat(lazypath) then
       { out, "WarningMsg" },
       { "\nPress any key to exit..." },
     }, true, {})
-    vim.fn.getchar()
+    if #vim.api.nvim_list_uis() > 0 then -- Nusku: no key to wait for when headless (installer sync)
+      vim.fn.getchar()
+    end
     os.exit(1)
   end
 end

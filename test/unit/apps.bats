@@ -637,17 +637,40 @@ in_hooks() {
     [ "$output" = "{}" ]
 }
 
-@test "neovim hook writes the languages file and runs the headless sync" {
+# Stub nvim plus a timeout stub that records its arguments, then runs the command (or fails
+# with TIMEOUT_RC, e.g. 124, as if the time limit was hit).
+nvim_stubs() {
     hook_stubs
-    printf '#!/bin/sh\necho "nvim $*" >>"$CALLS"\nexit "${NVIM_RC:-0}"\n' >"$STUBS/nvim"
-    chmod +x "$STUBS/nvim"
+    printf '#!/bin/sh\necho "nvim $*" >>"$CALLS"\n[ -t 0 ] && echo "nvim stdin is a tty" >>"$CALLS"\nexit "${NVIM_RC:-0}"\n' >"$STUBS/nvim"
+    printf '#!/bin/sh\necho "timeout $*" >>"$CALLS"\n[ -z "${TIMEOUT_RC:-}" ] || exit "$TIMEOUT_RC"\nshift\nexec "$@"\n' >"$STUBS/timeout"
+    chmod +x "$STUBS/nvim" "$STUBS/timeout"
     export NUSKU_CONFIG_DIR="$BATS_TEST_TMPDIR/nuskucfg"
-    run in_hooks "answers_set APPS neovim; answers_set LANGS 'go python'; apps_run_hooks; printf 'fail=%s\n' \"\${NUSKU_APP_FAILURES[*]}\""
+}
+
+@test "neovim hook writes the languages file and runs the headless sync with a time limit" {
+    nvim_stubs
+    run in_hooks "answers_set APPS neovim; answers_set LANGS 'go python'; apps_run_hooks; printf 'fail=[%s]\n' \"\${NUSKU_APP_FAILURES[*]}\""
     [ "$status" -eq 0 ]
     [ "$(tail -n1 "$NUSKU_CONFIG_DIR/nvim-languages.lua")" = 'return { "python", "go" }' ]
-    grep -qx "nvim --headless +lua require('nusku.sync').run()" "$CALLS"
-    [[ "$output" == *"fail="* ]]
-    [[ "$output" != *"setup failed"* ]]
-    NVIM_RC=1 run in_hooks "answers_set APPS neovim; answers_set LANGS ''; apps_run_hooks; printf 'fail=%s\n' \"\${NUSKU_APP_FAILURES[*]}\""
-    [[ "$output" == *"fail=Neovim (LazyVim): setup failed"* ]]
+    grep -qx "timeout 40m nvim --headless +lua require('nusku.sync').run() +cquit 2" "$CALLS"
+    grep -qx "nvim --headless +lua require('nusku.sync').run() +cquit 2" "$CALLS"
+    ! grep -q "stdin is a tty" "$CALLS" || false
+    [[ "$output" == *"fail=[]"* ]]
+}
+
+@test "neovim hook fails and is recorded when the sync exits non-zero" {
+    nvim_stubs
+    NVIM_RC=2 run in_hooks "answers_set APPS neovim; answers_set LANGS ''; apps_hook_neovim; echo \"rc=\$?\"; apps_run_hooks; printf 'fail=[%s]\n' \"\${NUSKU_APP_FAILURES[*]}\""
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"rc=2"* ]]
+    [[ "$output" == *"fail=[Neovim (LazyVim): setup failed]"* ]]
+}
+
+@test "neovim hook fails and is recorded when the sync times out" {
+    nvim_stubs
+    TIMEOUT_RC=124 run in_hooks "answers_set APPS neovim; answers_set LANGS ''; apps_hook_neovim; echo \"rc=\$?\"; apps_run_hooks; printf 'fail=[%s]\n' \"\${NUSKU_APP_FAILURES[*]}\""
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"rc=124"* ]]
+    [[ "$output" == *"fail=[Neovim (LazyVim): setup failed]"* ]]
+    ! grep -q '^nvim ' "$CALLS" || false
 }

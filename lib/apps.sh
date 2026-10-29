@@ -474,10 +474,12 @@ apps_write_nvim_languages() {
 }
 
 # apps_hook_neovim: install LazyVim's plugins (lazy-lock.json revisions), Mason tools and
-# treesitter parsers headless, so the first launch has nothing left to download.
+# treesitter parsers headless, so the first launch has nothing left to download. Never hangs:
+# "+cquit 2" exits if the +lua command errors outside run() (e.g. not our config), stdin is
+# /dev/null and the whole sync gets 40 minutes (timeout exits 124).
 apps_hook_neovim() {
     apps_write_nvim_languages "${NUSKU_CONFIG_DIR:-${XDG_CONFIG_HOME:-$HOME/.config}/nusku}/nvim-languages.lua" || return 1
-    run_soft nvim --headless "+lua require('nusku.sync').run()"
+    run_soft timeout 40m nvim --headless "+lua require('nusku.sync').run()" "+cquit 2" </dev/null
 }
 
 # apps_run_hooks: run apps_hook_<id> for each selected app (catalogue order), then each selected
