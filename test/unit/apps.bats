@@ -535,6 +535,29 @@ in_hooks() {
     ! grep -q 53317 "$CALLS" || false
 }
 
+@test "sunshine hook starts it at login and explains pairing" {
+    hook_stubs
+    run in_hooks "answers_set APPS 'sunshine firefox'; apps_run_hooks; apps_summary_notes"
+    [ "$status" -eq 0 ]
+    grep -qx 'systemctl --user enable app-dev.lizardbyte.app.Sunshine.service' "$CALLS"
+    [[ "$output" == *"https://localhost:47990"* ]]
+}
+
+@test "ufw hook opens Sunshine's streaming ports, not its settings page" {
+    hook_stubs
+    run in_hooks "answers_set APPS 'sunshine ufw'; apps_run_hooks"
+    [ "$status" -eq 0 ]
+    grep -q 'sudo ufw allow 47984,47989,48010/tcp comment Sunshine' "$CALLS"
+    grep -q 'sudo ufw allow 47998:48000,48002,48010/udp comment Sunshine' "$CALLS"
+    ! grep -q 47990 "$CALLS" || false
+}
+
+@test "ufw hook leaves Sunshine's ports closed without Sunshine" {
+    hook_stubs
+    run in_hooks "answers_set APPS ufw; apps_run_hooks"
+    ! grep -q Sunshine "$CALLS" || false
+}
+
 @test "ufw hook uses --force enable and enables the service" {
     hook_stubs
     run in_hooks "answers_set APPS ufw; apps_run_hooks"

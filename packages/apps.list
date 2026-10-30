@@ -65,6 +65,8 @@ app|gaming|steam|-|Steam|steam|multilib,gpu32
 app|gaming|lutris|-|Lutris|lutris wine winetricks|
 app|gaming|heroic|-|Heroic Games Launcher|aur:heroic-games-launcher-bin|
 app|gaming|parsec|-|Parsec (client)|aur:parsec-bin|
+app|gaming|sunshine|-|Sunshine (stream this PC to Moonlight)|aur:sunshine-bin|
+app|gaming|moonlight|-|Moonlight (play a Sunshine PC)|moonlight-qt|
 app|gaming|gamemode|-|GameMode|gamemode lib32-gamemode|multilib
 app|gaming|mangohud|-|MangoHud|mangohud lib32-mangohud|multilib
 app|gaming|protonup|-|ProtonUp-Qt|aur:protonup-qt|
