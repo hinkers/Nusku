@@ -1,0 +1,76 @@
+#!/usr/bin/env bash
+# nusku-quick: the quick-settings toggles in the swaync panel (SUPER + N, or the bell in the bar).
+#   nusku-quick status NAME   print true or false (swaync's update-command)
+#   nusku-quick toggle NAME   flip it
+#   nusku-quick power PROFILE set a power profile (power-saver, balanced, performance)
+# NAME: wifi bluetooth dnd night airplane caffeine mic power-<profile>
+set -uo pipefail
+
+NIGHT_TEMP="${NUSKU_NIGHT_TEMP:-4000}"
+
+say() { notify-send -a Nusku -u low "$@" 2>/dev/null || true; }
+bool() { if "$@" >/dev/null 2>&1; then echo true; else echo false; fi; }
+running() { pgrep -x "$1" >/dev/null 2>&1; }
+detach() { setsid -f "$@" >/dev/null 2>&1 </dev/null; }
+
+wifi_on() { [ "$(nmcli radio wifi 2>/dev/null)" = enabled ]; }
+bt_on() { bluetoothctl show 2>/dev/null | grep -q 'Powered: yes'; }
+dnd_on() { [ "$(swaync-client -D 2>/dev/null)" = true ]; }
+mic_muted() { wpctl get-volume @DEFAULT_AUDIO_SOURCE@ 2>/dev/null | grep -q MUTED; }
+# Airplane mode: every radio is soft-blocked (and there is at least one).
+airplane_on() {
+    local states
+    states="$(rfkill -n -o SOFT 2>/dev/null)" || return 1
+    [ -n "$states" ] && ! grep -qx unblocked <<<"$states"
+}
+
+status() {
+    case "$1" in
+        wifi) bool wifi_on ;;
+        bluetooth) bool bt_on ;;
+        dnd) bool dnd_on ;;
+        night) bool running hyprsunset ;;
+        airplane) bool airplane_on ;;
+        caffeine) bool eval '! running hypridle' ;;
+        mic) bool mic_muted ;;
+        power-*) bool test "$(powerprofilesctl get 2>/dev/null)" = "${1#power-}" ;;
+        *) echo false; return 2 ;;
+    esac
+}
+
+toggle() {
+    case "$1" in
+        wifi) if wifi_on; then nmcli radio wifi off; else nmcli radio wifi on; fi ;;
+        bluetooth)
+            if bt_on; then
+                bluetoothctl power off
+            else
+                rfkill unblock bluetooth 2>/dev/null
+                bluetoothctl power on
+            fi ;;
+        dnd) swaync-client -d -sw ;;
+        night)
+            if running hyprsunset; then
+                pkill -x hyprsunset
+            elif command -v hyprsunset >/dev/null 2>&1; then
+                detach hyprsunset -t "$NIGHT_TEMP"
+            else
+                say "Night light" "hyprsunset is not installed. Run nusku-update to add it."
+                return 1
+            fi ;;
+        airplane) if airplane_on; then rfkill unblock all; else rfkill block all; fi ;;
+        caffeine)
+            # Keep awake = hypridle stopped; it comes back on the next login anyway.
+            if running hypridle; then pkill -x hypridle; else detach hypridle; fi ;;
+        mic) wpctl set-mute @DEFAULT_AUDIO_SOURCE@ toggle ;;
+        power-*) powerprofilesctl set "${1#power-}" ;;
+        *) echo "nusku-quick: unknown toggle: $1" >&2; return 2 ;;
+    esac
+}
+
+case "${1:-}" in
+    status) status "${2:?which toggle?}" ;;
+    toggle) toggle "${2:?which toggle?}" >/dev/null ;;
+    power) toggle "power-${2:?which profile?}" >/dev/null ;;
+    *) sed -n '2,6s/^# \{0,1\}//p' "$0"; exit 2 ;;
+esac

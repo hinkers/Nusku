@@ -42,6 +42,7 @@ thunar-volman
 gvfs
 tumbler
 brightnessctl
+hyprsunset   # night light toggle in quick settings
 playerctl
 xdg-user-dirs
 

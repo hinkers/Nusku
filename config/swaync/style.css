@@ -230,30 +230,6 @@ scrollbar trough {
   margin: 2px 0;
 }
 
-/* dnd */
-
-.widget-dnd {
-  margin-top: 5px;
-  border-radius: 8px;
-  font-size: 1.1rem;
-}
-
-.widget-dnd > switch {
-  font-size: initial;
-  border-radius: 8px;
-  background: @surface0;
-  box-shadow: none;
-}
-
-.widget-dnd > switch:checked {
-  background: @accent;
-}
-
-.widget-dnd > switch slider {
-  background: @surface1;
-  border-radius: 8px;
-}
-
 /* mpris */
 
 .widget-mpris-player {
@@ -307,58 +283,102 @@ scrollbar trough {
   opacity: 0.5;
 }
 
-.widget-menubar > box > .menu-button-bar > button > label {
-  font-size: 3rem;
-  padding: 0.5rem 2rem;
-}
-
-.widget-menubar > box > .menu-button-bar > :last-child {
-  color: @red;
-}
-
-.power-buttons button:hover,
-.powermode-buttons button:hover,
-.screenshot-buttons button:hover {
-  background: @surface0;
-}
-
-.control-center .widget-label > label {
-  color: @text;
-  font-size: 2rem;
-}
+/* Quick settings (Nusku): pill radios, round toggles, segmented power modes, thick sliders */
 
 .widget-buttons-grid {
-  padding-top: 1rem;
+  margin: 4px 0;
 }
 
-.widget-buttons-grid > flowbox > flowboxchild > button label {
-  font-size: 2.5rem;
+.widget-buttons-grid flowboxchild > button {
+  background-color: @surface0;
+  color: @text;
+  border-radius: 999px;
+  margin: 5px;
+  min-height: 52px;
 }
 
+.widget-buttons-grid flowboxchild > button:hover {
+  background-color: @surface1;
+}
+
+.widget-buttons-grid flowboxchild > button label {
+  font-size: 1.5rem;
+}
+
+.widget-buttons-grid flowboxchild > button.toggle:checked {
+  background-color: @accent;
+  color: @crust;
+}
+
+.radios flowboxchild > button {
+  min-height: 60px;
+  padding: 0 18px;
+}
+
+.radios flowboxchild > button label {
+  font-size: 1.05rem;
+  font-weight: bold;
+}
+
+.power {
+  background-color: @mantle;
+  border-radius: 999px;
+  margin: 6px 5px;
+  padding: 4px;
+}
+
+.power flowboxchild > button {
+  background-color: transparent;
+  color: @subtext0;
+  min-height: 40px;
+  margin: 0;
+}
+
+.power flowboxchild > button label {
+  font-size: 0.95rem;
+}
+
+.widget-backlight,
 .widget-volume {
-  padding: 1rem 0;
+  background-color: @mantle;
+  border-radius: 999px;
+  margin: 5px;
+  padding: 10px 6px;
+}
+
+.widget-backlight label,
+.widget-volume label {
+  font-size: 1.3rem;
+  padding: 0 4px 0 12px;
+}
+
+.widget-backlight label {
+  color: @yellow;
 }
 
 .widget-volume label {
-  color: @sapphire;
-  padding: 0 1rem;
+  color: @accent;
 }
 
-.widget-volume trough highlight {
-  background: @sapphire;
+.widget-backlight trough,
+.widget-volume trough {
+  min-height: 14px;
 }
 
 .widget-backlight trough highlight {
   background: @yellow;
 }
 
-.widget-backlight label {
-  font-size: 1.5rem;
-  color: @yellow;
+.widget-volume trough highlight {
+  background: @accent;
 }
 
-.widget-backlight .KB {
-  padding-bottom: 1rem;
+.widget-mpris {
+  margin: 6px 5px;
+}
+
+.control-center .widget-title {
+  margin: 12px 5px 0;
 }
 
 .image {

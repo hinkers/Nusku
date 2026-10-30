@@ -2,7 +2,7 @@
 # A glob in src links each match into the dest directory by basename.
 config/hypr .config/hypr
 config/waybar .config/waybar
-config/swaync .config/swaync
+config/swaync/style.css .config/swaync/style.css
 config/rofi .config/rofi
 config/kitty .config/kitty
 config/btop/themes .config/btop/themes

@@ -83,6 +83,7 @@ Any of the 14 Catppuccin accents works: rosewater flamingo pink mauve red maroon
 ## Top bar and app launcher
 
 - Click the network module to pick a network (`nmtui` in a floating terminal); right-click for the full connection editor. Click Bluetooth for the Bluetooth manager.
+- Click the bell (or press Super + N) for quick settings: Wi-Fi and Bluetooth, then Do Not Disturb, night light, airplane mode, keep awake (pauses screen lock and sleep until the next login) and mic mute; then screenshot, wallpaper and power menu. Below them: brightness (laptops), volume, power mode, the media player and your notifications. The panel layout is `config/swaync/config.template.json`; the installer writes `~/.config/swaync/config.json` from it on every install and update, leaving out the brightness slider on machines without a backlight and power modes the machine does not offer.
 - The app launcher hides developer and system tools (Qt tools, xgps, Rofi, theme tools) and gives a few apps a Papirus icon so they match. The list is `config/applications/overrides.list`; the tweaks live in `~/.local/share/applications` and are refreshed on every update. A `.desktop` file you put there yourself always wins.
 
 ## Per-machine overrides
@@ -123,7 +124,7 @@ With a Lua config, `hyprctl dispatch` takes `hl.dsp.*` expressions (e.g. `hyprct
 | Super + W | Wallpaper picker |
 | Super + Escape | Power menu |
 | Super + / | Search keybinds |
-| Super + N | Notification centre |
+| Super + N | Quick settings and notifications |
 | Super + L | Lock screen |
 | Super + Q | Close window |
 | Super + F | Fullscreen |

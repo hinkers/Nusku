@@ -1,0 +1,142 @@
+{
+  "$schema": "/etc/xdg/swaync/configSchema.json",
+  "positionX": "right",
+  "positionY": "top",
+  "layer": "overlay",
+  "control-center-layer": "top",
+  "cssPriority": "user",
+  "control-center-margin-top": 8,
+  "control-center-margin-bottom": 8,
+  "control-center-margin-right": 8,
+  "control-center-margin-left": 0,
+  "control-center-width": 420,
+  "fit-to-screen": true,
+  "notification-window-width": 400,
+  "notification-icon-size": 48,
+  "notification-body-image-height": 100,
+  "notification-body-image-width": 200,
+  "timeout": 8,
+  "timeout-low": 4,
+  "timeout-critical": 0,
+  "transition-time": 150,
+  "hide-on-clear": false,
+  "hide-on-action": true,
+  "keyboard-shortcuts": true,
+  "image-visibility": "when-available",
+  "script-fail-notify": true,
+  "widgets": [
+    "buttons-grid#radios",
+    "buttons-grid#toggles",
+    "backlight",
+    "volume",
+    "buttons-grid#power",
+    "mpris",
+    "title",
+    "notifications"
+  ],
+  "widget-config": {
+    "buttons-grid#radios": {
+      "buttons-per-row": 2,
+      "actions": [
+        {
+          "label": "󰖩   Wi-Fi",
+          "type": "toggle",
+          "command": "$HOME/.local/bin/nusku-quick toggle wifi",
+          "update-command": "$HOME/.local/bin/nusku-quick status wifi"
+        },
+        {
+          "label": "󰂯   Bluetooth",
+          "type": "toggle",
+          "command": "$HOME/.local/bin/nusku-quick toggle bluetooth",
+          "update-command": "$HOME/.local/bin/nusku-quick status bluetooth"
+        }
+      ]
+    },
+    "buttons-grid#toggles": {
+      "buttons-per-row": 4,
+      "actions": [
+        {
+          "label": "󰂛",
+          "type": "toggle",
+          "command": "$HOME/.local/bin/nusku-quick toggle dnd",
+          "update-command": "$HOME/.local/bin/nusku-quick status dnd"
+        },
+        {
+          "label": "󰖔",
+          "type": "toggle",
+          "command": "$HOME/.local/bin/nusku-quick toggle night",
+          "update-command": "$HOME/.local/bin/nusku-quick status night"
+        },
+        {
+          "label": "󰀝",
+          "type": "toggle",
+          "command": "$HOME/.local/bin/nusku-quick toggle airplane",
+          "update-command": "$HOME/.local/bin/nusku-quick status airplane"
+        },
+        {
+          "label": "󰅶",
+          "type": "toggle",
+          "command": "$HOME/.local/bin/nusku-quick toggle caffeine",
+          "update-command": "$HOME/.local/bin/nusku-quick status caffeine"
+        },
+        {
+          "label": "󰍭",
+          "type": "toggle",
+          "command": "$HOME/.local/bin/nusku-quick toggle mic",
+          "update-command": "$HOME/.local/bin/nusku-quick status mic"
+        },
+        {
+          "label": "󰹑",
+          "command": "swaync-client -cp; sleep 0.3; hyprshot -m region -o ~/Pictures/Screenshots"
+        },
+        {
+          "label": "󰸉",
+          "command": "swaync-client -cp; $HOME/.local/bin/nusku-menu-wallpaper"
+        },
+        {
+          "label": "󰐥",
+          "command": "swaync-client -cp; $HOME/.local/bin/nusku-menu-power"
+        }
+      ]
+    },
+    "backlight": {
+      "label": "󰃟",
+      "device": "intel_backlight"
+    },
+    "volume": {
+      "label": "󰕾"
+    },
+    "buttons-grid#power": {
+      "buttons-per-row": 3,
+      "actions": [
+        {
+          "label": "󰾆  Saver",
+          "type": "toggle",
+          "command": "$HOME/.local/bin/nusku-quick power power-saver",
+          "update-command": "$HOME/.local/bin/nusku-quick status power-power-saver"
+        },
+        {
+          "label": "󰾅  Balanced",
+          "type": "toggle",
+          "command": "$HOME/.local/bin/nusku-quick power balanced",
+          "update-command": "$HOME/.local/bin/nusku-quick status power-balanced"
+        },
+        {
+          "label": "󰓅  Performance",
+          "type": "toggle",
+          "command": "$HOME/.local/bin/nusku-quick power performance",
+          "update-command": "$HOME/.local/bin/nusku-quick status power-performance"
+        }
+      ]
+    },
+    "mpris": {
+      "show-album-art": "when-available",
+      "autohide": true
+    },
+    "title": {
+      "text": "Notifications",
+      "clear-all-button": true,
+      "button-text": "Clear all"
+    }
+  }
+}

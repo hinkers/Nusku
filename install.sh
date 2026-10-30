@@ -27,6 +27,8 @@ source "$REPO_ROOT/lib/packages.sh"
 source "$REPO_ROOT/lib/grub.sh"
 # shellcheck source=lib/gpu.sh
 source "$REPO_ROOT/lib/gpu.sh"
+# shellcheck source=lib/swaync.sh
+source "$REPO_ROOT/lib/swaync.sh"
 # shellcheck source=lib/launcher.sh
 source "$REPO_ROOT/lib/launcher.sh"
 # shellcheck source=lib/theme.sh
@@ -289,18 +291,22 @@ step_theme() {
 
 step_dotfiles() {
     step "Dotfiles"
-    # Older installs linked all of ~/.config/btop into the repo; btop then rewrote
-    # btop.conf inside the repo. Drop that link so only the themes dir is linked.
-    local btop_dir="$HOME/.config/btop"
-    # Any checkout counts (the repo may have moved): linking themes through it would edit that checkout.
-    if [ -L "$btop_dir" ]; then
-        case "$(readlink "$btop_dir")" in
-            */config/btop)
-                rm -f "$btop_dir"
-                log_info "Removed old Nusku link $btop_dir"
-                ;;
-        esac
-    fi
+    # Older installs linked all of ~/.config/btop (btop then rewrote btop.conf inside the repo)
+    # and all of ~/.config/swaync (its config.json is now written per machine). Drop those
+    # directory links so only the files listed in links.txt are linked.
+    # Any checkout counts (the repo may have moved): linking files through it would edit that checkout.
+    local name dir
+    for name in btop swaync; do
+        dir="$HOME/.config/$name"
+        if [ -L "$dir" ]; then
+            case "$(readlink "$dir")" in
+                */config/"$name")
+                    rm -f "$dir"
+                    log_info "Removed old Nusku link $dir"
+                    ;;
+            esac
+        fi
+    done
     deploy_dotfiles "$REPO_ROOT"
 }
 
@@ -316,6 +322,9 @@ step_local_files() {
         cp "$REPO_ROOT/config/btop/btop.conf" "$btop_conf"
         log_info "Created $btop_conf"
     fi
+    # Rewritten every run (like gpu.lua): the brightness slider and power modes depend on the machine.
+    swaync_write_config "$REPO_ROOT/config/swaync/config.template.json" "$HOME/.config/swaync/config.json" &&
+        { ! pgrep -x swaync >/dev/null 2>&1 || swaync-client -R >/dev/null 2>&1 || true; }
     if [ ! -e "$NUSKU_CONFIG_DIR/gpu.lua" ]; then
         gpu_hypr_lua "$(answers_get GPU)" "$(gpu_virt)" >"$NUSKU_CONFIG_DIR/gpu.lua"
     fi

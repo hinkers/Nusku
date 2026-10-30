@@ -33,7 +33,7 @@ B.bind(key(mod, "B"),      "Web browser",       'hl.dsp.exec_cmd("~/.local/bin/n
 B.bind(key(mod, "V"),      "Clipboard history", 'hl.dsp.exec_cmd("~/.local/bin/nusku-menu-clipboard")')
 B.bind(key(mod, "W"),      "Change wallpaper",  'hl.dsp.exec_cmd("~/.local/bin/nusku-menu-wallpaper")')
 B.bind(key(mod, "Escape"), "Power menu",        'hl.dsp.exec_cmd("~/.local/bin/nusku-menu-power")')
-B.bind(key(mod, "N"),      "Notifications",     'hl.dsp.exec_cmd("swaync-client -t -sw")')
+B.bind(key(mod, "N"),      "Quick settings",    'hl.dsp.exec_cmd("swaync-client -t -sw")')
 B.bind(key(mod, "slash"),  "Search keybinds",   'hl.dsp.exec_cmd("~/.local/bin/nusku-menu-keybinds")')
 
 -- --- Session ----------------------------------------------------------
