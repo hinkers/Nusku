@@ -46,7 +46,9 @@
         },
         {
           "label": "󱘖",
-          "command": "swaync-client -cp; $HOME/.local/bin/nusku-menu-wifi"
+          "command": "swaync-client -cp; $HOME/.local/bin/nusku-menu-wifi",
+          "type": "toggle",
+          "update-command": "$HOME/.local/bin/nusku-quick status wifi"
         },
         {
           "label": "󰂯   Bluetooth",
@@ -56,7 +58,9 @@
         },
         {
           "label": "󱘖",
-          "command": "swaync-client -cp; $HOME/.local/bin/nusku-menu-bluetooth"
+          "command": "swaync-client -cp; $HOME/.local/bin/nusku-menu-bluetooth",
+          "type": "toggle",
+          "update-command": "$HOME/.local/bin/nusku-quick status bluetooth"
         }
       ]
     },
