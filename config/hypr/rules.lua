@@ -16,6 +16,14 @@ hl.window_rule({
     match = { class = [[^(nm-connection-editor)$]] },
     float = true,
 })
+-- Network picker (waybar network click): nmtui in a floating kitty.
+hl.window_rule({
+    name = "nusku-float-nmtui",
+    match = { class = [[^(nusku-nmtui)$]] },
+    float = true,
+    size = "720 520",
+    center = true,
+})
 -- File chooser portal dialogs.
 hl.window_rule({
     name = "nusku-float-file-chooser",

@@ -27,6 +27,8 @@ source "$REPO_ROOT/lib/packages.sh"
 source "$REPO_ROOT/lib/grub.sh"
 # shellcheck source=lib/gpu.sh
 source "$REPO_ROOT/lib/gpu.sh"
+# shellcheck source=lib/launcher.sh
+source "$REPO_ROOT/lib/launcher.sh"
 # shellcheck source=lib/theme.sh
 source "$REPO_ROOT/lib/theme.sh"
 # shellcheck source=lib/dotfiles.sh
@@ -340,6 +342,7 @@ step_system() {
 step_apps_setup() {
     step "Apps setup"
     apps_run_hooks
+    launcher_apply "$REPO_ROOT/config/applications/overrides.list"
 }
 
 step_summary() {

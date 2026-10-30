@@ -162,3 +162,22 @@ in_sub() {
     run in_sub 'for a in "${NUSKU_ACCENTS[@]}"; do [[ "${SDDM_THEME_SHA256[$a]:-}" =~ ^[0-9a-f]{64}$ ]] || echo "missing $a"; done'
     [ -z "$output" ]
 }
+
+@test "every accent maps to a Papirus folder colour" {
+    run in_sub 'for a in "${NUSKU_ACCENTS[@]}"; do papirus_folder_color "$a"; done | sort -u | tr "\n" " "'
+    [ "$output" = "blue cyan green indigo magenta orange paleorange pink red teal violet yellow " ]
+}
+
+@test "papirus_folders_apply recolours Papirus-Dark with sudo" {
+    printf '#!/bin/sh\necho "papirus-folders $*" >>"$CALLS"\n' >"$STUBS/papirus-folders"
+    chmod +x "$STUBS/papirus-folders"
+    run in_sub 'papirus_folders_apply mauve'
+    [ "$status" -eq 0 ]
+    grep -qxF 'sudo papirus-folders -C violet --theme Papirus-Dark' "$CALLS"
+}
+
+@test "papirus_folders_apply without papirus-folders only warns" {
+    run in_sub 'command() { [ "${2:-}" = papirus-folders ] && return 1; builtin command "$@"; }; papirus_folders_apply blue'
+    [ "$status" -eq 0 ]
+    ! grep -q papirus-folders "$CALLS" || false
+}

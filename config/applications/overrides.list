@@ -1,0 +1,31 @@
+# Launcher tweaks, applied by lib/launcher.sh to ~/.local/share/applications on every install
+# and update. Apps stay installed; only their launcher entry changes. Entries for apps that
+# are not installed are skipped.
+#
+#   hide <file.desktop>          keep it out of the app launcher (NoDisplay=true)
+#   icon <file.desktop> <icon>   use this icon name instead (one Papirus has, so it matches)
+
+# Developer and system tools nobody launches from the menu.
+hide assistant.desktop
+hide designer.desktop
+hide linguist.desktop
+hide qdbusviewer.desktop
+hide qv4l2.desktop
+hide qvidcap.desktop
+hide lstopo.desktop
+hide xgps.desktop
+hide xgpsspeed.desktop
+hide xfce4-about.desktop
+hide rofi.desktop
+hide rofi-theme-selector.desktop
+hide blueman-adapters.desktop
+hide thunar-volman-settings.desktop
+
+# Theme tools: Nusku sets these up (and nusku-theme changes the accent).
+hide qt5ct.desktop
+hide qt6ct.desktop
+hide kvantummanager.desktop
+
+# Apps whose own icon is not in Papirus.
+icon spotify-launcher.desktop spotify
+icon yazi.desktop mc

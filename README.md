@@ -78,7 +78,12 @@ When Neovim (LazyVim) is picked, `~/.config/nvim` becomes a link to the repo's [
 nusku-theme mauve
 ```
 
-Any of the 14 Catppuccin accents works: rosewater flamingo pink mauve red maroon peach yellow green teal sky sapphire blue lavender. Hyprland, Waybar, SwayNC, rofi and kitty update straight away; the login screen and the GTK cursor follow after `nusku-update` (or `./install.sh --update`).
+Any of the 14 Catppuccin accents works: rosewater flamingo pink mauve red maroon peach yellow green teal sky sapphire blue lavender. Hyprland, Waybar, SwayNC, rofi and kitty update straight away; the login screen, the GTK cursor and the folder colour (the nearest Papirus folder colour) follow after `nusku-update` (or `./install.sh --update`).
+
+## Top bar and app launcher
+
+- Click the network module to pick a network (`nmtui` in a floating terminal); right-click for the full connection editor. Click Bluetooth for the Bluetooth manager.
+- The app launcher hides developer and system tools (Qt tools, xgps, Rofi, theme tools) and gives a few apps a Papirus icon so they match. The list is `config/applications/overrides.list`; the tweaks live in `~/.local/share/applications` and are refreshed on every update. A `.desktop` file you put there yourself always wins.
 
 ## Per-machine overrides
 

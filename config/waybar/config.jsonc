@@ -48,10 +48,12 @@
 
   "network": {
     "format-wifi": "󰤨 {essid}",
-    "format-ethernet": "󰈀 {ifname}",
+    "format-ethernet": "󰈀 Wired",
+    "format-linked": "󰈀 No IP",
     "format-disconnected": "󰤭 offline",
     "tooltip-format": "{ifname}: {ipaddr}",
-    "on-click": "nm-connection-editor"
+    "on-click": "kitty --class nusku-nmtui -e nmtui",
+    "on-click-right": "nm-connection-editor"
   },
 
   "bluetooth": {

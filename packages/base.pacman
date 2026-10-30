@@ -32,7 +32,7 @@ wireplumber
 sof-firmware   # Intel laptop audio (speakers, mic); unused elsewhere
 pavucontrol
 networkmanager
-network-manager-applet
+nm-connection-editor   # waybar network right-click; left-click runs nmtui
 bluez
 bluez-utils
 blueman

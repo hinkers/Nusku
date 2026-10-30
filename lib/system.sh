@@ -160,6 +160,34 @@ gtk_apply_settings() {
     gsettings set org.gnome.desktop.interface color-scheme 'prefer-dark' || log_warn "gsettings color-scheme failed"
 }
 
+# papirus_folder_color ACCENT: the Papirus folder colour closest to a Catppuccin accent.
+papirus_folder_color() {
+    case "$1" in
+        rosewater) echo paleorange ;;
+        flamingo) echo pink ;;
+        pink) echo magenta ;;
+        mauve) echo violet ;;
+        red | maroon) echo red ;;
+        peach) echo orange ;;
+        yellow) echo yellow ;;
+        green) echo green ;;
+        teal) echo teal ;;
+        sky) echo cyan ;;
+        lavender) echo indigo ;;
+        *) echo blue ;; # sapphire, blue
+    esac
+}
+
+# papirus_folders_apply ACCENT: recolour the Papirus-Dark folders to match the accent. Its own
+# pacman hook re-applies the colour after Papirus updates.
+papirus_folders_apply() {
+    if ! command -v papirus-folders >/dev/null 2>&1; then
+        log_warn "papirus-folders not installed; folders keep the default colour"
+        return 0
+    fi
+    run_soft sudo papirus-folders -C "$(papirus_folder_color "$1")" --theme Papirus-Dark
+}
+
 # system_configure: everything above, driven by the answers.
 system_configure() {
     local accent gpu autologin
@@ -177,4 +205,5 @@ system_configure() {
     shell_set_zsh
     user_dirs_setup
     gtk_apply_settings "$accent"
+    papirus_folders_apply "$accent"
 }
