@@ -4,12 +4,16 @@
   "position": "top",
   "height": 34,
   "spacing": 4,
-  "modules-left": ["hyprland/workspaces", "hyprland/window"],
+  "modules-left": ["ext/workspaces", "hyprland/window"],
   "modules-center": ["clock"],
-  "modules-right": ["tray", "pulseaudio", "network", "bluetooth", "battery", "custom/notification"],
+  "modules-right": ["tray", "battery", "group/quick"],
 
-  "hyprland/workspaces": {
-    "format": "{id}",
+  // ext/workspaces switches through the Wayland workspace protocol. hyprland/workspaces sends the
+  // old "dispatch workspace N" command, which a Lua Hyprland config rejects, so clicks did nothing.
+  "ext/workspaces": {
+    "format": "{name}",
+    "on-click": "activate",
+    "sort-by-id": true,
     "all-outputs": false
   },
 
@@ -36,33 +40,37 @@
     "spacing": 8
   },
 
-  "pulseaudio": {
-    "format": "{icon} {volume}%",
-    "format-muted": "󰝟 muted",
-    "format-icons": {
-      "default": ["󰕿", "󰖀", "󰕾"]
-    },
-    "on-click": "pavucontrol",
-    "scroll-step": 5
+  // One pill for network, Bluetooth and notifications: a click opens quick settings (swaync),
+  // which has the toggles, sliders and notifications. Right-click network or Bluetooth for their tools.
+  "group/quick": {
+    "orientation": "horizontal",
+    "modules": ["network", "bluetooth", "custom/notification"]
   },
 
   "network": {
-    "format-wifi": "󰤨 {essid}",
-    "format-ethernet": "󰈀 Wired",
-    "format-linked": "󰈀 No IP",
-    "format-disconnected": "󰤭 offline",
-    "tooltip-format": "{ifname}: {ipaddr}",
-    "on-click": "kitty --class nusku-nmtui -e nmtui",
-    "on-click-right": "nm-connection-editor"
+    "format-wifi": "{icon}",
+    "format-icons": ["󰤟", "󰤢", "󰤥", "󰤨"],
+    "format-ethernet": "󰈀",
+    "format-linked": "󰈀",
+    "format-disconnected": "󰤭",
+    "tooltip-format-wifi": "{essid} ({signalStrength}%)\n{ipaddr}",
+    "tooltip-format-ethernet": "Wired: {ifname}\n{ipaddr}",
+    "tooltip-format-linked": "Wired: {ifname} (no IP)",
+    "tooltip-format-disconnected": "Offline",
+    "on-click": "swaync-client -t -sw",
+    "on-click-right": "kitty --class nusku-nmtui -e nmtui"
   },
 
   "bluetooth": {
     "format": "󰂯",
     "format-off": "󰂲",
     "format-disabled": "󰂲",
-    "format-connected": "󰂱 {num_connections}",
-    "tooltip-format": "{controller_alias}\t{controller_address}",
-    "on-click": "blueman-manager"
+    "format-connected": "󰂱",
+    "tooltip-format": "Bluetooth: {status}",
+    "tooltip-format-connected": "Bluetooth: {device_enumerate}",
+    "tooltip-format-enumerate-connected": "{device_alias}",
+    "on-click": "swaync-client -t -sw",
+    "on-click-right": "blueman-manager"
   },
 
   "battery": {

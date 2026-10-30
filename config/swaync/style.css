@@ -29,7 +29,7 @@
 
 * {
   all: unset;
-  font-size: 14px;
+  font-size: 13px;
   font-family: "JetBrainsMono Nerd Font";
   transition: 200ms;
 }
@@ -183,9 +183,9 @@ trough {
 /* In the panel, notifications match the quick settings: filled, borderless, round. */
 .control-center .notification-background {
   background-color: @mantle;
-  border-radius: 20px;
+  border-radius: 18px;
   box-shadow: none;
-  margin: 4px 5px;
+  margin: 3px 4px;
 }
 
 .control-center .notification-background .notification {
@@ -264,18 +264,18 @@ scrollbar trough {
 }
 
 .widget-mpris-album-art {
-  -gtk-icon-size: 100px;
+  -gtk-icon-size: 64px;
   border-radius: 12.6px;
   margin: 0 10px;
 }
 
 .widget-mpris-title {
-  font-size: 1.2rem;
+  font-size: 1rem;
   color: @text;
 }
 
 .widget-mpris-subtitle {
-  font-size: 1rem;
+  font-size: 0.9rem;
   color: @subtext1;
 }
 
@@ -312,8 +312,8 @@ scrollbar trough {
   background-color: @surface0;
   color: @text;
   border-radius: 999px;
-  margin: 5px;
-  min-height: 52px;
+  margin: 4px;
+  min-height: 40px;
 }
 
 .widget-buttons-grid flowboxchild > button:hover {
@@ -321,7 +321,7 @@ scrollbar trough {
 }
 
 .widget-buttons-grid flowboxchild > button label {
-  font-size: 1.5rem;
+  font-size: 1.15rem;
 }
 
 .widget-buttons-grid flowboxchild > button.toggle:checked {
@@ -330,45 +330,45 @@ scrollbar trough {
 }
 
 .radios flowboxchild > button {
-  min-height: 60px;
-  padding: 0 18px;
+  min-height: 46px;
+  padding: 0 14px;
 }
 
 .radios flowboxchild > button label {
-  font-size: 1.05rem;
+  font-size: 0.95rem;
   font-weight: bold;
 }
 
 .power {
   background-color: @mantle;
   border-radius: 999px;
-  margin: 6px 5px;
-  padding: 4px;
+  margin: 4px;
+  padding: 3px;
 }
 
 .power flowboxchild > button {
   background-color: transparent;
   color: @subtext0;
-  min-height: 40px;
+  min-height: 32px;
   margin: 0;
 }
 
 .power flowboxchild > button label {
-  font-size: 0.95rem;
+  font-size: 0.85rem;
 }
 
 .widget-backlight,
 .widget-volume {
   background-color: @mantle;
   border-radius: 999px;
-  margin: 5px;
-  padding: 10px 6px;
+  margin: 4px;
+  padding: 6px 4px;
 }
 
 .widget-backlight label,
 .widget-volume label {
-  font-size: 1.3rem;
-  padding: 0 4px 0 12px;
+  font-size: 1.1rem;
+  padding: 0 2px 0 10px;
 }
 
 .widget-backlight label {
@@ -381,7 +381,7 @@ scrollbar trough {
 
 .widget-backlight trough,
 .widget-volume trough {
-  min-height: 14px;
+  min-height: 10px;
 }
 
 .widget-backlight trough highlight {
@@ -393,7 +393,7 @@ scrollbar trough {
 }
 
 .widget-mpris {
-  margin: 6px 5px;
+  margin: 4px;
 }
 
 .control-center .widget-title {
