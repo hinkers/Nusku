@@ -36,7 +36,7 @@
   ],
   "widget-config": {
     "buttons-grid#radios": {
-      "buttons-per-row": 2,
+      "buttons-per-row": 4,
       "actions": [
         {
           "label": "󰖩   Wi-Fi",
@@ -45,10 +45,18 @@
           "update-command": "$HOME/.local/bin/nusku-quick status wifi"
         },
         {
+          "label": "󰅀",
+          "command": "swaync-client -cp; kitty --class nusku-nmtui -e nmtui"
+        },
+        {
           "label": "󰂯   Bluetooth",
           "type": "toggle",
           "command": "$HOME/.local/bin/nusku-quick toggle bluetooth",
           "update-command": "$HOME/.local/bin/nusku-quick status bluetooth"
+        },
+        {
+          "label": "󰅀",
+          "command": "swaync-client -cp; blueman-manager"
         }
       ]
     },

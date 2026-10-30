@@ -339,6 +339,24 @@ scrollbar trough {
   font-weight: bold;
 }
 
+/* Split buttons: each toggle is followed by a small chevron that opens its full settings.
+   The pair is joined: the toggle keeps its left curve, the chevron its right. */
+.radios flowboxchild:nth-child(odd) > button {
+  border-radius: 999px 6px 6px 999px;
+  margin-right: 1px;
+}
+
+.radios flowboxchild:nth-child(even) > button {
+  border-radius: 6px 999px 999px 6px;
+  margin-left: 1px;
+  min-width: 40px;
+  padding: 0;
+}
+
+.radios flowboxchild:nth-child(even) > button label {
+  font-size: 1rem;
+}
+
 .power {
   background-color: @mantle;
   border-radius: 999px;
