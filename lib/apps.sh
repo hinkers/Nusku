@@ -449,6 +449,7 @@ apps_hook_ufw() {
             # Streaming ports only; the settings page (47990) stays reachable from this PC alone.
             run_soft sudo ufw allow 47984,47989,48010/tcp comment Sunshine || return 1
             run_soft sudo ufw allow 47998:48000,48002,48010/udp comment Sunshine || return 1
+            run_soft sudo ufw allow 5353/udp comment "Sunshine discovery (mDNS)" || return 1
             ;;
     esac
     if _apps_ssh_on; then
@@ -462,8 +463,10 @@ apps_hook_ufw() {
 # Sunshine's own user unit (alias sunshine.service); it starts with the Hyprland session.
 NUSKU_SUNSHINE_UNIT="app-dev.lizardbyte.app.Sunshine.service"
 
-# apps_hook_sunshine: start the stream host at every login, and say how to pair.
+# apps_hook_sunshine: start the stream host at every login, and say how to pair. Moonlight finds
+# the host through Avahi (mDNS), which Arch installs but leaves off.
 apps_hook_sunshine() {
+    run_soft sudo systemctl enable --now avahi-daemon.service || return 1
     run_soft systemctl --user enable "$NUSKU_SUNSHINE_UNIT" || return 1
     NUSKU_APP_NOTES+=("Sunshine starts at login. Open https://localhost:47990 on this PC to create its login, then pair Moonlight with the PIN it shows.")
 }

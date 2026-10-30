@@ -539,6 +539,7 @@ in_hooks() {
     hook_stubs
     run in_hooks "answers_set APPS 'sunshine firefox'; apps_run_hooks; apps_summary_notes"
     [ "$status" -eq 0 ]
+    grep -qx 'sudo systemctl enable --now avahi-daemon.service' "$CALLS"
     grep -qx 'systemctl --user enable app-dev.lizardbyte.app.Sunshine.service' "$CALLS"
     [[ "$output" == *"https://localhost:47990"* ]]
 }
@@ -549,6 +550,7 @@ in_hooks() {
     [ "$status" -eq 0 ]
     grep -q 'sudo ufw allow 47984,47989,48010/tcp comment Sunshine' "$CALLS"
     grep -q 'sudo ufw allow 47998:48000,48002,48010/udp comment Sunshine' "$CALLS"
+    grep -q 'sudo ufw allow 5353/udp' "$CALLS"
     ! grep -q 47990 "$CALLS" || false
 }
 
