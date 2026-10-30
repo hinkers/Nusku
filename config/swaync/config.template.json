@@ -134,9 +134,9 @@
       "autohide": true
     },
     "title": {
-      "text": "Notifications",
+      "text": "NOTIFICATIONS",
       "clear-all-button": true,
-      "button-text": "Clear all"
+      "button-text": "CLEAR ALL"
     }
   }
 }
