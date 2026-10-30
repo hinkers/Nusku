@@ -29,7 +29,7 @@ The installer asks which extra apps to install, group by group (a `None` item cl
 | Media | Spotify ★, VLC ★, OBS Studio, Audacity |
 | Creative | GIMP, Krita, Inkscape, Kdenlive, Blender |
 | ArtCraft | PhotoCraft, VectorCraft, FilmCraft, LightCraft, PdfCraft, EffectCraft, DesignCraft, FigCraft, WordCraft, SoundCraft, DeckCraft, CADCraft, GridCraft |
-| Gaming | Steam, Lutris, Heroic, GameMode, MangoHud, ProtonUp-Qt, Wine (multilib is enabled when needed) |
+| Gaming | Steam, Lutris, Heroic, Parsec (client), GameMode, MangoHud, ProtonUp-Qt, Wine (multilib is enabled when needed) |
 | System tools | Yazi, Flatpak, Snapper (btrfs roots only), GParted, UFW firewall, Pokémon in fastfetch |
 
 Pick at least one browser from Everyday. If web links have no default yet, the first browser you picked becomes the default, and `Super + B` opens it. With no browser picked, the summary warns that links won't open.
