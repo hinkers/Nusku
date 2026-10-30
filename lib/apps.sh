@@ -528,6 +528,66 @@ apps_hook_neovim() {
     run_soft timeout 40m nvim --headless "+lua require('nusku.sync').run()" "+cquit 2" </dev/null
 }
 
+# --- Web browser ----------------------------------------------------------------------
+# apps_browser_desktop ID: the .desktop file a browser app installs.
+apps_browser_desktop() {
+    case "$1" in
+        firefox) echo firefox.desktop ;;
+        chromium) echo chromium.desktop ;;
+        brave) echo brave-browser.desktop ;;
+        zen) echo zen.desktop ;;
+        librewolf) echo io.gitlab.librewolf-community.desktop ;;
+        *) return 1 ;;
+    esac
+}
+
+# _apps_desktop_exists FILE: status 0 when FILE is in an applications dir (system, user, Flatpak).
+_apps_desktop_exists() {
+    local d dirs
+    dirs="${XDG_DATA_HOME:-$HOME/.local/share}:${XDG_DATA_DIRS:-/usr/local/share:/usr/share}"
+    dirs="$dirs:/var/lib/flatpak/exports/share:${XDG_DATA_HOME:-$HOME/.local/share}/flatpak/exports/share"
+    local IFS=:
+    for d in $dirs; do
+        [ -f "$d/applications/$1" ] && return 0
+    done
+    return 1
+}
+
+# apps_browser_setup: with no browser picked, add a summary note. Otherwise, when web links have
+# no default or point at a browser that is gone, make the first installed picked browser the default.
+apps_browser_setup() {
+    local id desktop current first=""
+    for id in $(answers_get APPS); do
+        apps_has_flag "$id" browser || continue
+        desktop="$(apps_browser_desktop "$id")" || continue
+        if _apps_desktop_exists "$desktop"; then
+            first="$desktop"
+            break
+        fi
+    done
+    if [ -z "$first" ]; then
+        if ! _apps_any_browser_picked; then
+            NUSKU_APP_NOTES+=("No web browser is installed, so links will not open. Pick one with ./install.sh --apps.")
+        fi
+        return 0
+    fi
+    current="$(xdg-mime query default x-scheme-handler/https 2>/dev/null || true)"
+    if [ -n "$current" ] && _apps_desktop_exists "$current"; then
+        log_info "Web links already open in $current; leaving it"
+        return 0
+    fi
+    run_soft xdg-mime default "$first" x-scheme-handler/http x-scheme-handler/https text/html
+}
+
+# _apps_any_browser_picked: status 0 when APPS holds a browser (installed or not).
+_apps_any_browser_picked() {
+    local id
+    for id in $(answers_get APPS); do
+        apps_has_flag "$id" browser && return 0
+    done
+    return 1
+}
+
 # apps_run_hooks: run apps_hook_<id> for each selected app (catalogue order), then each selected
 # language. A failing hook is recorded and the rest still run. A picked btrfs-only app on another
 # filesystem gets a summary note instead.
@@ -545,4 +605,5 @@ apps_run_hooks() {
         declare -F "$fn" >/dev/null || continue
         "$fn" || NUSKU_APP_FAILURES+=("$(apps_label "$id"): setup failed")
     done < <(awk -F'|' '$1 == "app" { print $3 } $1 == "lang" { print $2 }' "$NUSKU_APPS_LIST")
+    apps_browser_setup
 }

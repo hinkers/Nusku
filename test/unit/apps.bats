@@ -497,7 +497,7 @@ in_hooks() {
 
 @test "docker hook skips usermod and the note when already in the group" {
     hook_stubs
-    ID_GROUPS="wheel docker" run in_hooks "answers_set APPS docker; apps_run_hooks; apps_summary_notes"
+    ID_GROUPS="wheel docker" run in_hooks "answers_set APPS 'docker firefox'; apps_run_hooks; apps_summary_notes"
     [ "$status" -eq 0 ]
     grep -q 'sudo systemctl enable docker.service' "$CALLS"
     ! grep -q usermod "$CALLS" || false
@@ -506,7 +506,7 @@ in_hooks() {
 
 @test "docker hook leaves no note when usermod fails" {
     hook_stubs
-    SUDO_FAIL=usermod run in_hooks "answers_set APPS docker; apps_run_hooks; apps_summary_notes; printf 'fail=[%s]\n' \"\${NUSKU_APP_FAILURES[*]}\""
+    SUDO_FAIL=usermod run in_hooks "answers_set APPS 'docker firefox'; apps_run_hooks; apps_summary_notes; printf 'fail=[%s]\n' \"\${NUSKU_APP_FAILURES[*]}\""
     [ "$status" -eq 0 ]
     [[ "$output" != *"Notes:"* ]]
     [[ "$output" == *"fail=[Docker + Compose: setup failed]"* ]]
@@ -596,6 +596,58 @@ in_hooks() {
     PDF_DEFAULT=org.gnome.Evince.desktop run in_hooks "answers_set APPS zathura; apps_run_hooks"
     [ "$status" -eq 0 ]
     grep -q '^xdg-mime query default application/pdf' "$CALLS"
+    ! grep -q '^xdg-mime default' "$CALLS" || false
+}
+
+# fake_desktop FILE...: installed .desktop files, in a data dir passed as XDG_DATA_DIRS="$SHARE".
+fake_desktop() {
+    SHARE="$BATS_TEST_TMPDIR/share"
+    mkdir -p "$SHARE/applications"
+    local f
+    for f in "$@"; do : >"$SHARE/applications/$f"; done
+}
+
+@test "every browser in the catalogue has a desktop file" {
+    run in_sub 'for id in $(awk -F"|" "\$1 == \"app\" && \$7 ~ /browser/ { print \$3 }" "$NUSKU_APPS_LIST"); do apps_browser_desktop "$id" || echo "missing $id"; done'
+    [ "$status" -eq 0 ]
+    [[ "$output" != *missing* ]]
+    [[ "$output" == *firefox.desktop* ]]
+}
+
+@test "no browser picked: summary note" {
+    hook_stubs
+    run in_hooks "answers_set APPS discord; apps_run_hooks; apps_summary_notes"
+    [[ "$output" == *"No web browser is installed"* ]]
+    ! grep -q '^xdg-mime default' "$CALLS" || false
+}
+
+@test "picked browser that failed to install: no extra note (the failure list covers it)" {
+    hook_stubs
+    fake_desktop
+    XDG_DATA_DIRS="$SHARE" run in_hooks "answers_set APPS brave; apps_run_hooks; apps_summary_notes"
+    [[ "$output" != *"No web browser"* ]]
+    ! grep -q '^xdg-mime default' "$CALLS" || false
+}
+
+@test "browser becomes the default for web links when none is set" {
+    hook_stubs
+    fake_desktop brave-browser.desktop
+    XDG_DATA_DIRS="$SHARE" run in_hooks "answers_set APPS 'zen brave'; apps_run_hooks"
+    grep -qxF 'xdg-mime default brave-browser.desktop x-scheme-handler/http x-scheme-handler/https text/html' "$CALLS"
+}
+
+@test "browser replaces a default that is no longer installed" {
+    hook_stubs
+    fake_desktop chromium.desktop
+    PDF_DEFAULT=firefox.desktop XDG_DATA_DIRS="$SHARE" run in_hooks "answers_set APPS chromium; apps_run_hooks"
+    grep -q '^xdg-mime default chromium.desktop x-scheme-handler/http' "$CALLS"
+}
+
+@test "an installed default browser is kept" {
+    hook_stubs
+    fake_desktop chromium.desktop firefox.desktop
+    PDF_DEFAULT=firefox.desktop XDG_DATA_DIRS="$SHARE" run in_hooks "answers_set APPS chromium; apps_run_hooks"
+    [ "$status" -eq 0 ]
     ! grep -q '^xdg-mime default' "$CALLS" || false
 }
 

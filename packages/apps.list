@@ -7,7 +7,8 @@
 # '*' marks the pre-selected favourites. Tokens: name (official repo), aur:name, flatpak:app.id.
 # artcraft:ID installs the ArtCraft release package from github.com/storytold/ID (lib/artcraft.sh).
 # Flags: multilib (needs the multilib repo), gpu32 (add the GPU's 32-bit Vulkan driver),
-# btrfs (only offered when / is btrfs). Labels contain no ',' or '|' (gum --selected is comma-separated).
+# btrfs (only offered when / is btrfs), browser (a web browser; see apps_browser_setup).
+# Labels contain no ',' or '|' (gum --selected is comma-separated).
 
 group|dev|Dev
 app|dev|neovim|*|Neovim (LazyVim)|neovim tree-sitter-cli wl-clipboard unzip lazygit fd ripgrep nodejs npm|
@@ -18,7 +19,11 @@ app|dev|docker|-|Docker + Compose|docker docker-compose docker-buildx|
 app|dev|vscode|-|VS Code|aur:visual-studio-code-bin|
 
 group|everyday|Everyday
-app|everyday|firefox|*|Firefox|firefox|
+app|everyday|firefox|*|Firefox|firefox|browser
+app|everyday|chromium|-|Chromium|chromium|browser
+app|everyday|brave|-|Brave|aur:brave-bin|browser
+app|everyday|zen|-|Zen Browser|aur:zen-browser-bin|browser
+app|everyday|librewolf|-|LibreWolf (Flatpak)|flatpak:io.gitlab.librewolf-community|browser
 app|everyday|discord|*|Discord|discord|
 app|everyday|obsidian|*|Obsidian|obsidian|
 app|everyday|libreoffice|-|LibreOffice|libreoffice-fresh|

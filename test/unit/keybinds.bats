@@ -83,11 +83,9 @@ SHIFT + Print" ]
     ! grep -q 'SUPER + SHIFT + E' <<<"$output" || false
 }
 
-@test "Firefox bind only when firefox exists" {
-    HYPR_STUB_EXISTS=/usr/bin/firefox load_binds
-    records '$3 == "SUPER + B" { print $6 }' | grep -qxF 'hl.dsp.exec_cmd("firefox")'
-    HYPR_STUB_MISSING=/usr/bin/firefox load_binds
-    ! records '$3 == "SUPER + B"' | grep -q . || false
+@test "SUPER + B opens the default browser through nusku-browser" {
+    load_binds
+    records '$3 == "SUPER + B" { print $6 }' | grep -qxF 'hl.dsp.exec_cmd("~/.local/bin/nusku-browser")'
 }
 
 @test "fields with tabs are sanitised" {

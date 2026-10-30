@@ -1,0 +1,17 @@
+#!/usr/bin/env bash
+# nusku-browser [URL...]: open the default web browser (SUPER + B), or tell the user there is none.
+set -uo pipefail
+
+default="$(xdg-mime query default x-scheme-handler/https 2>/dev/null)"
+
+# The default first, then any browser Nusku offers, in catalogue order.
+for desktop in "$default" firefox.desktop chromium.desktop brave-browser.desktop zen.desktop \
+    io.gitlab.librewolf-community.desktop; do
+    [ -n "$desktop" ] || continue
+    if gtk-launch "${desktop%.desktop}" "$@" 2>/dev/null; then
+        exit 0
+    fi
+done
+
+notify-send -a Nusku "No web browser" "Install one with ./install.sh --apps (Everyday group)."
+exit 1

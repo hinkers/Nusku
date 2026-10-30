@@ -25,12 +25,14 @@ The installer asks which extra apps to install, group by group (a `None` item cl
 | Group | Apps |
 | --- | --- |
 | Dev | Neovim (LazyVim) ★, GitHub CLI ★, Claude Code ★, lazygit, Docker + Compose, VS Code |
-| Everyday | Firefox ★, Discord ★, Obsidian ★, LibreOffice, Thunderbird, Bitwarden (Flatpak), Zathura, LocalSend |
+| Everyday | Firefox ★, Chromium, Brave, Zen Browser, LibreWolf (Flatpak), Discord ★, Obsidian ★, LibreOffice, Thunderbird, Bitwarden (Flatpak), Zathura, LocalSend |
 | Media | Spotify ★, VLC ★, OBS Studio, Audacity |
 | Creative | GIMP, Krita, Inkscape, Kdenlive, Blender |
 | ArtCraft | PhotoCraft, VectorCraft, FilmCraft, LightCraft, PdfCraft, EffectCraft, DesignCraft, FigCraft, WordCraft, SoundCraft, DeckCraft, CADCraft, GridCraft |
 | Gaming | Steam, Lutris, Heroic, GameMode, MangoHud, ProtonUp-Qt, Wine (multilib is enabled when needed) |
 | System tools | Yazi, Flatpak, Snapper (btrfs roots only), GParted, UFW firewall, Pokémon in fastfetch |
+
+Pick at least one browser from Everyday. If web links have no default yet, the first browser you picked becomes the default, and `Super + B` opens it. With no browser picked, the summary warns that links won't open.
 
 Every new terminal greets you with fastfetch (Arch logo, Nerd Font icons, Catppuccin colours). Tick **Pokémon in fastfetch** (System tools) to swap the logo for a random Gen 1-3 Pokémon from [krabby](https://github.com/yannjor/krabby); shinies show up at krabby's default 1/128. Turn it on later with `./install.sh --apps`. Unticking it later does not uninstall krabby, so the Pokémon stays until you remove the `krabby-bin` package. Nusku ships no Pokémon art.
 
@@ -111,7 +113,7 @@ With a Lua config, `hyprctl dispatch` takes `hl.dsp.*` expressions (e.g. `hyprct
 | Super + Return | Terminal (kitty) |
 | Super + Space | App launcher (rofi) |
 | Super + E | File manager (Thunar) |
-| Super + B | Web browser (Firefox, when installed) |
+| Super + B | Web browser (your default) |
 | Super + V | Clipboard history |
 | Super + W | Wallpaper picker |
 | Super + Escape | Power menu |

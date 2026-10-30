@@ -27,14 +27,8 @@ do
     end
 end
 
--- Firefox, only when installed (it is optional)
-do
-    local f = io.open("/usr/bin/firefox", "r")
-    if f then
-        f:close()
-        B.bind(key(mod, "B"), "Web browser (Firefox)", 'hl.dsp.exec_cmd("firefox")')
-    end
-end
+-- The default browser; nusku-browser says so when none is installed.
+B.bind(key(mod, "B"),      "Web browser",       'hl.dsp.exec_cmd("~/.local/bin/nusku-browser")')
 
 B.bind(key(mod, "V"),      "Clipboard history", 'hl.dsp.exec_cmd("~/.local/bin/nusku-menu-clipboard")')
 B.bind(key(mod, "W"),      "Change wallpaper",  'hl.dsp.exec_cmd("~/.local/bin/nusku-menu-wallpaper")')
