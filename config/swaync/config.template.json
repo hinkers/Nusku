@@ -92,16 +92,16 @@
           "update-command": "$HOME/.local/bin/nusku-quick status caffeine"
         },
         {
-          "label": "󰍭",
-          "type": "toggle",
-          "command": "$HOME/.local/bin/nusku-quick toggle mic",
-          "update-command": "$HOME/.local/bin/nusku-quick status mic"
-        },
-        {
           "label": "󰝟",
           "type": "toggle",
           "command": "$HOME/.local/bin/nusku-quick toggle sound",
           "update-command": "$HOME/.local/bin/nusku-quick status sound"
+        },
+        {
+          "label": "󰍭",
+          "type": "toggle",
+          "command": "$HOME/.local/bin/nusku-quick toggle mic",
+          "update-command": "$HOME/.local/bin/nusku-quick status mic"
         },
         {
           "label": "󰹑",
