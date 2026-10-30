@@ -83,6 +83,13 @@ SHIFT + Print" ]
     ! grep -q 'SUPER + SHIFT + E' <<<"$output" || false
 }
 
+@test "Firefox bind only when firefox exists" {
+    HYPR_STUB_EXISTS=/usr/bin/firefox load_binds
+    records '$3 == "SUPER + B" { print $6 }' | grep -qxF 'hl.dsp.exec_cmd("firefox")'
+    HYPR_STUB_MISSING=/usr/bin/firefox load_binds
+    ! records '$3 == "SUPER + B"' | grep -q . || false
+}
+
 @test "fields with tabs are sanitised" {
     cat >"$BATS_TEST_TMPDIR/one.lua" <<'LUA'
 local B = require("bindlib")
@@ -119,9 +126,9 @@ LUA
     cat >"$BATS_TEST_TMPDIR/both.lua" <<'LUA'
 dofile("config/hypr/keybinds.lua")
 local B = require("bindlib")
-B.bind("SUPER + B", "Firefox", 'hl.dsp.exec_cmd("firefox")')
+B.bind("SUPER + D", "Discord", 'hl.dsp.exec_cmd("discord")')
 LUA
     load_binds "$BATS_TEST_TMPDIR/both.lua"
-    records '$3 == "SUPER + B" { print $4 "|" $5 "|" $6 }' | grep -qxF 'Firefox|1|hl.dsp.exec_cmd("firefox")'
+    records '$3 == "SUPER + D" { print $4 "|" $5 "|" $6 }' | grep -qxF 'Discord|1|hl.dsp.exec_cmd("discord")'
     records '$3 == "SUPER + slash"' | grep -q .
 }

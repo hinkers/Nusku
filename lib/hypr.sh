@@ -14,7 +14,7 @@ hypr_write_local_lua() {
 -- Syntax: https://wiki.hypr.land/Configuring/  Examples:
 --   hl.monitor({ output = "DP-1", mode = "2560x1440@144", position = "0x0", scale = 1 })
 --   hl.config({ input = { kb_layout = "us,de", kb_options = "grp:alt_shift_toggle" } })
---   hl.bind("SUPER + B", hl.dsp.exec_cmd("firefox"))
+--   hl.bind("SUPER + D", hl.dsp.exec_cmd("discord"))
 EOF
     log_info "Created $file"
 }
