@@ -29,6 +29,10 @@ source "$REPO_ROOT/lib/grub.sh"
 source "$REPO_ROOT/lib/gpu.sh"
 # shellcheck source=lib/swaync.sh
 source "$REPO_ROOT/lib/swaync.sh"
+# shellcheck source=lib/tui.sh
+source "$REPO_ROOT/lib/tui.sh"
+# shellcheck source=lib/questions.sh
+source "$REPO_ROOT/lib/questions.sh"
 # shellcheck source=lib/launcher.sh
 source "$REPO_ROOT/lib/launcher.sh"
 # shellcheck source=lib/theme.sh
@@ -56,7 +60,7 @@ Options:
   --update         Reuse your saved answers, skip the questions and re-apply
                    every step (what nusku-update runs after pulling).
   --apps           Change which optional apps and languages are installed, then re-apply.
-  --reconfigure    Ask the questions again even if answers are saved.
+  --reconfigure    Open the settings menu again (starts from your saved answers).
   --no-reboot      Do not offer to reboot at the end.
   -h, --help       Show this help.
 EOF
@@ -169,31 +173,21 @@ step_questions() {
         answers_load "$opt_answers"
     elif [ -r "$SAVED_ANSWERS" ]; then
         answers_load "$SAVED_ANSWERS"
-        if [ "$opt_reconfigure" -eq 1 ]; then
-            NUSKU_ANSWERS=()
-        fi
     fi
 
-    local suggested gpu
+    local suggested
     suggested="$(gpu_suggest)"
-    ask_menu GPU "Which graphics do you have?" "$suggested" \
-        amd "AMD graphics" \
-        intel "Intel graphics" \
-        nvidia "NVIDIA graphics (desktop)" \
-        hybrid-intel "Intel + NVIDIA laptop" \
-        hybrid-amd "AMD + NVIDIA laptop" \
-        vm "Virtual machine"
-    gpu="$(answers_get GPU)"
-    case "$gpu" in
-        nvidia | hybrid-*)
-            ask_menu NVIDIA_MODULE "Which NVIDIA driver?" open \
-                open "open — RTX 20xx / GTX 16xx and newer (recommended)" \
-                proprietary "proprietary — legacy driver for GTX 900/10xx (AUR)"
-            ;;
-    esac
-    ask_menu AUR_HELPER "Which AUR helper?" paru \
-        paru "paru (recommended)" \
-        yay "yay"
+    # Interactive: one menu with every setting (prefilled from saved answers on --reconfigure).
+    # --apps goes straight to the app list below. The ask_menu calls then only check answers.
+    if [ "$NUSKU_NONINTERACTIVE" != "1" ] && [ "$opt_apps" -eq 0 ] &&
+        { [ "$opt_reconfigure" -eq 1 ] || questions_needed; }; then
+        questions_menu "$suggested"
+    fi
+    ask_menu GPU "Which graphics do you have?" "$suggested" "${Q_GPU[@]}"
+    if q_needs_nvidia; then
+        ask_menu NVIDIA_MODULE "Which NVIDIA driver?" open "${Q_NVIDIA[@]}"
+    fi
+    ask_menu AUR_HELPER "Which AUR helper?" paru "${Q_AUR[@]}"
     local -a accent_menu=()
     local a
     for a in "${NUSKU_ACCENTS[@]}"; do

@@ -13,14 +13,20 @@ git clone https://github.com/hinkers/Nusku.git && cd Nusku && ./install.sh
 ```bash
 nusku-update               # git pull --ff-only, then ./install.sh --update
 ./install.sh --update      # re-apply every step with your saved answers, no questions
-./install.sh --reconfigure # ask the questions again (GPU, driver, AUR helper, accent, apps)
+./install.sh --reconfigure # open the settings menu again (GPU, driver, AUR helper, accent, apps)
 ```
 
 Your answers are saved in `~/.config/nusku/answers`.
 
+On a fresh install the questions are one menu, like archinstall's: each setting is listed with its current value (the graphics are detected for you). Use the arrow keys to move, Enter to change a setting, Esc to go back, and pick **Install** when it looks right. Try the menus without installing anything with `test/tui-demo.sh` (or `test/tui-demo.sh apps`).
+
 ## Optional apps and languages
 
-The installer asks which extra apps to install, group by group (a `None` item clears a group). The ★ items are pre-selected on a fresh install.
+Apps are one list: each group is a header with its apps indented underneath, folded until you open it. The ★ items are pre-selected on a fresh install.
+
+- ↑/↓ move, Space ticks an app (on a group header, it ticks or clears the whole group).
+- Enter or → opens a group, ← closes it (from an app, ← jumps back to its group).
+- **Done** at the bottom saves; Esc leaves without changes; Ctrl+C cancels the install.
 
 | Group | Apps |
 | --- | --- |
@@ -38,11 +44,11 @@ Every new terminal greets you with fastfetch (Arch logo, Nerd Font icons, Catppu
 
 Remote desktop: **Remmina** connects to other machines over VNC or RDP (Windows Remote Desktop); **Parsec** (Gaming) connects to Parsec hosts. **Sunshine** (Gaming) hosts: it streams this PC to Moonlight on another computer, phone or TV, like a Parsec host, which Parsec does not offer on Linux. It starts at login, and Avahi is turned on so Moonlight can find it; open `https://localhost:47990` on this PC once to create its login, then pick this PC in Moonlight and type the PIN it shows into that page. It works on your home network, or from outside through a VPN such as Tailscale. If Moonlight cannot find or connect to this PC, check that the other device has no VPN running and that the router is not isolating Wi-Fi clients (guest network or "AP isolation"). With UFW picked as well, the streaming ports are opened; the settings page stays local. **Moonlight** (Gaming) is the viewer, for playing another Sunshine PC from this one. **wayvnc** shares this screen. Run `wayvnc` when you want it; it listens on this machine only (`127.0.0.1:5900`), so connect through an SSH tunnel (`ssh -L 5900:localhost:5900 you@this-pc`, then point the viewer at `localhost`). Before letting it listen on your network (`wayvnc 0.0.0.0`), turn on a password and TLS in `~/.config/wayvnc/config` (see `man wayvnc`), because plain VNC is unencrypted.
 
-The language picker opens right after the Dev group's checklist: Python, PHP, GDScript, JavaScript/TypeScript, Rust, Go, C/C++, C#, Java, Lua. Each installs its runtime and package manager; the Neovim language server, formatter and parser come from LazyVim. Esc leaves a checklist unchanged; Ctrl+C cancels the install.
+**Languages** is a group in the same list, right under Dev: Python, PHP, GDScript, JavaScript/TypeScript, Rust, Go, C/C++, C#, Java, Lua. Each installs its runtime and package manager; the Neovim language server, formatter and parser come from LazyVim.
 
 ```bash
-./install.sh --apps        # re-open only the app and language picker, starting from your saved picks
-./install.sh --reconfigure # ask everything again, with the picker starting from the ★ defaults
+./install.sh --apps        # re-open only the app list, starting from your saved picks
+./install.sh --reconfigure # open the settings menu again, starting from your saved answers
 ```
 
 Unticking an app later does not uninstall it; remove it with `pacman -Rns` (or `flatpak uninstall`) yourself.

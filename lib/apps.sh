@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Optional app and language catalogue (packages/apps.list), parsed with awk, never sourced. Sourced, not executed.
-# Needs lib/log.sh (die) and lib/answers.sh (answers_get); the install and hook functions also
+# Needs lib/log.sh (die), lib/answers.sh (answers_get) and, for the picker, lib/tui.sh; the install and hook functions also
 # use lib/packages.sh (pkg_*) and lib/dotfiles.sh (link_file).
 
 : "${NUSKU_APPS_LIST:=${NUSKU_ROOT:-.}/packages/apps.list}"
@@ -78,141 +78,87 @@ apps_validate_answers() {
 }
 
 # --- Picker ---------------------------------------------------------------------------
-# Working selections (space-padded id lists) while the picker runs.
-_APPS_SEL=" "
-_APPS_LANGS=" "
-
-# _apps_pick_label ID: the checklist line of an app ("★ Label" for the favourites).
-_apps_pick_label() {
-    if apps_has_star "$1"; then
-        printf '★ %s\n' "$(apps_label "$1")"
-    else
-        apps_label "$1"
-    fi
-}
+# One folding list (lib/tui.sh): each group is a header with its apps indented underneath, and
+# Languages is a group of its own right after Dev. Space ticks, Enter opens a group, Done saves,
+# Esc keeps what was there before.
 
 # apps_has_star ID: status 0 when the app is a pre-selected favourite.
 apps_has_star() {
     awk -F'|' -v id="$1" '$1 == "app" && $3 == id && $4 == "*" { f = 1 } END { exit !f }' "$NUSKU_APPS_LIST"
 }
 
-# _apps_count GROUP: "selected/total" for a group of apps.
-_apps_count() {
-    local id n=0 t=0
-    for id in $(apps_in_group "$1"); do
-        t=$((t + 1))
-        case "$_APPS_SEL" in *" $id "*) n=$((n + 1)) ;; esac
-    done
-    printf '%s/%s' "$n" "$t"
-}
-
-# _apps_gum_status STATUS: gum exits 1 on Esc (handled by the caller) and 130 on Ctrl+C, which
-# cancels the whole install.
-_apps_gum_status() {
-    [ "$1" -ne 130 ] || die "Cancelled"
-}
-
-# _apps_pick_group GROUP: checklist over one group. Esc changes nothing; an empty reply or a
-# ticked "None" clears the group.
-_apps_pick_group() {
-    local g="$1" id line out pre="" sel=" "
-    local -a ids=() lines=()
-    for id in $(apps_in_group "$g"); do
-        ids+=("$id")
-        lines+=("$(_apps_pick_label "$id")")
-        case "$_APPS_SEL" in *" $id "*) pre="${pre:+$pre,}${lines[-1]}" ;; esac
-    done
-    out="$(gum choose --no-limit --header "$(apps_group_label "$g") — space toggles, ctrl+a selects all, enter confirms" \
-        --selected "$pre" None "${lines[@]}")" || {
-        _apps_gum_status "$?"
-        return 0
+# _apps_tree_build SEL LANGS: fill the tui_tree arrays (and _APPS_ROW, "app:ID" or "lang:ID" per
+# row) from the catalogue, ticking the ids in the space-padded lists SEL and LANGS.
+_APPS_ROW=()
+_apps_tree_build() {
+    local sel="$1" langs="$2" g id row
+    local -A label=() star=()
+    while IFS='|' read -r kind a b c d; do
+        case "$kind" in
+            app) label["app:$a"]="$c" star["app:$a"]="$b" ;;
+            lang) label["lang:$a"]="$b" ;;
+        esac
+    done < <(awk -F'|' '$1 == "app" { print "app|" $3 "|" $4 "|" $5 } $1 == "lang" { print "lang|" $2 "|" $3 }' "$NUSKU_APPS_LIST")
+    TUI_T_KIND=() TUI_T_LABEL=() TUI_T_PARENT=() TUI_T_ON=() TUI_T_OPEN=() _APPS_ROW=()
+    _apps_tree_add() { # KIND LABEL PARENT ON ROWID
+        TUI_T_KIND+=("$1") TUI_T_LABEL+=("$2") TUI_T_PARENT+=("$3") TUI_T_ON+=("$4") TUI_T_OPEN+=(0)
+        _APPS_ROW+=("$5")
     }
-    while IFS= read -r line; do
-        for id in "${ids[@]}"; do
-            [ "$(_apps_pick_label "$id")" = "$line" ] && sel="$sel$id "
+    for g in $(apps_groups); do
+        row=${#TUI_T_KIND[@]}
+        _apps_tree_add g "$(apps_group_label "$g")" "" 0 "group:$g"
+        for id in $(apps_in_group "$g"); do
+            local on=0 text="${label[app:$id]}"
+            case "$sel" in *" $id "*) on=1 ;; esac
+            [ "${star[app:$id]}" != "*" ] || text="$text $TUI_MUTED$TUI_SYM_STAR$TUI_RESET"
+            _apps_tree_add i "$text" "$row" "$on" "app:$id"
         done
-    done <<<"$out"
-    case $'
-'"$out"$'
-' in *$'
-None
-'*) sel=" " ;; esac
-    for id in "${ids[@]}"; do
-        _APPS_SEL="${_APPS_SEL// $id / }"
+        if [ "$g" = dev ] && [ -n "$(apps_langs)" ]; then
+            row=${#TUI_T_KIND[@]}
+            _apps_tree_add g "Languages" "" 0 "group:languages"
+            for id in $(apps_langs); do
+                local on=0
+                case "$langs" in *" $id "*) on=1 ;; esac
+                _apps_tree_add i "${label[lang:$id]}" "$row" "$on" "lang:$id"
+            done
+        fi
     done
-    _APPS_SEL="$_APPS_SEL${sel# }"
-}
-
-# _apps_pick_langs: checklist over the languages. Esc changes nothing; an empty reply or a
-# ticked "None" clears them.
-_apps_pick_langs() {
-    local id line out pre="" sel=" "
-    local -a ids=() labels=()
-    for id in $(apps_langs); do
-        ids+=("$id")
-        labels+=("$(apps_label "$id")")
-        case "$_APPS_LANGS" in *" $id "*) pre="${pre:+$pre,}${labels[-1]}" ;; esac
-    done
-    out="$(gum choose --no-limit --header "Languages — runtimes, tools and Neovim support" \
-        --selected "$pre" None "${labels[@]}")" || {
-        _apps_gum_status "$?"
-        return 0
-    }
-    while IFS= read -r line; do
-        for id in "${ids[@]}"; do
-            [ "$(apps_label "$id")" = "$line" ] && sel="$sel$id "
-        done
-    done <<<"$out"
-    case $'
-'"$out"$'
-' in *$'
-None
-'*) sel=" " ;; esac
-    _APPS_LANGS="$sel"
 }
 
 # apps_ask: interactive picker; stores APPS (catalogue order) and LANGS. Starts from the stored
-# picks when the keys exist, else from the starred apps and no languages.
+# picks when the keys exist, else from the starred apps and no languages. Esc keeps that start.
 apps_ask() {
-    local g id choice label menu_hdr="Optional apps — pick a group to change, then Done"
+    local sel langs i id apps="" picked_langs=""
     if [ -n "${NUSKU_ANSWERS[APPS]+x}" ]; then
-        _APPS_SEL=" ${NUSKU_ANSWERS[APPS]} "
+        sel=" ${NUSKU_ANSWERS[APPS]} "
     else
-        _APPS_SEL=" $(apps_starred) "
+        sel=" $(apps_starred) "
     fi
-    _APPS_LANGS=" ${NUSKU_ANSWERS[LANGS]:-} "
-    local -a menu=()
-    while :; do
-        menu=()
-        for g in $(apps_groups); do
-            menu+=("$(apps_group_label "$g") ($(_apps_count "$g"))")
+    langs=" ${NUSKU_ANSWERS[LANGS]:-} "
+    tui_open "${NUSKU_ANSWERS[ACCENT]:-blue}"
+    _apps_tree_build "$sel" "$langs"
+    if tui_tree "Optional apps" "$TUI_SYM_STAR marks the usual picks. Untick anything you do not want; pick Done to save."; then
+        sel=" " langs=" "
+        for i in "${!_APPS_ROW[@]}"; do
+            [ "${TUI_T_KIND[$i]}" = i ] && [ "${TUI_T_ON[$i]}" = 1 ] || continue
+            id="${_APPS_ROW[$i]}"
+            case "$id" in
+                app:*) sel="$sel${id#app:} " ;;
+                lang:*) langs="$langs${id#lang:} " ;;
+            esac
         done
-        menu+=("Done")
-        choice="$(gum choose --header "$menu_hdr" "${menu[@]}")" || {
-            _apps_gum_status "$?"
-            break
-        }
-        [ "$choice" != "Done" ] || break
-        for g in $(apps_groups); do
-            label="$(apps_group_label "$g") ($(_apps_count "$g"))"
-            if [ "$choice" = "$label" ]; then
-                _apps_pick_group "$g"
-                [ "$g" != dev ] || _apps_pick_langs
-                break
-            fi
-        done
-    done
-    local apps="" langs=""
+    fi
+    tui_close
     while IFS= read -r id; do
-        case "$_APPS_SEL" in *" $id "*) apps="${apps:+$apps }$id" ;; esac
+        case "$sel" in *" $id "*) apps="${apps:+$apps }$id" ;; esac
     done < <(awk -F'|' '$1 == "app" { print $3 }' "$NUSKU_APPS_LIST")
     for id in $(apps_langs); do
-        case "$_APPS_LANGS" in *" $id "*) langs="${langs:+$langs }$id" ;; esac
+        case "$langs" in *" $id "*) picked_langs="${picked_langs:+$picked_langs }$id" ;; esac
     done
     answers_set APPS "$apps"
-    answers_set LANGS "$langs"
+    answers_set LANGS "$picked_langs"
     log_info "Apps: ${apps:-none}"
-    log_info "Languages: ${langs:-none}"
+    log_info "Languages: ${picked_langs:-none}"
 }
 
 # apps_default_missing: non-interactive runs treat unsaved APPS/LANGS as "none".

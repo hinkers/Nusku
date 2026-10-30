@@ -156,144 +156,131 @@ in_fix() {
     [ -z "$output" ]
 }
 
-# --- apps_ask: the picker, driven by a fake gum -----------------------------------------
-# The fake gum answers one call per reply file $GUM_DIR/replies/N (N = call number, from 1) and
-# records that call's arguments to $GUM_DIR/call-N. A reply of ESC makes it exit 1 and CTRLC exit
-# 130, as gum 2.0.2 does for Esc and Ctrl+C; a call with no reply file acts like Esc.
-# A multi-line reply is what a --no-limit checklist prints (one selected label per line).
+# --- apps_ask: the folding app list, driven by keys from a file ----------------------------
+# Keys go through NUSKU_TUI_IN; the screen goes to $BATS_TEST_TMPDIR/screen. Running out of keys
+# acts like Esc. Rows start folded: Dev, Languages, Everyday, Media, Creative, ArtCraft, Gaming,
+# System tools, then Done. Key names: U D L R (arrows), E (End), S (space), N (enter), X (Esc).
 
-fake_gum() {
-    export GUM_DIR="$BATS_TEST_TMPDIR/gum"
-    mkdir -p "$GUM_DIR/replies" "$BATS_TEST_TMPDIR/bin"
-    cat >"$BATS_TEST_TMPDIR/bin/gum" <<'GUM'
-#!/usr/bin/env bash
-n=$(( $(cat "$GUM_DIR/n" 2>/dev/null || echo 0) + 1 ))
-echo "$n" >"$GUM_DIR/n"
-printf '%s\n' "$@" >"$GUM_DIR/call-$n"
-reply="$GUM_DIR/replies/$n"
-[ -f "$reply" ] || exit 1
-case "$(cat "$reply")" in ESC) exit 1 ;; CTRLC) exit 130 ;; esac
-cat "$reply"
-GUM
-    chmod +x "$BATS_TEST_TMPDIR/bin/gum"
-    local i=1 r
-    for r in "$@"; do
-        printf '%s\n' "$r" >"$GUM_DIR/replies/$i"
-        i=$((i + 1))
+keys() {
+    local k out=""
+    for k in "$@"; do
+        case "$k" in
+            U) out+=$'\e[A' ;; D) out+=$'\e[B' ;; R) out+=$'\e[C' ;; L) out+=$'\e[D' ;;
+            E) out+=$'\e[F' ;; S) out+=' ' ;; N) out+=$'\n' ;; X) out+=$'\e' ;; C) out+=$'\x03' ;;
+        esac
     done
+    printf '%s' "$out" >"$BATS_TEST_TMPDIR/keys"
 }
 
 # Run apps_ask (real catalogue) after SETUP, then print APPS and LANGS. Its stderr goes to
 # $BATS_TEST_TMPDIR/ask.err.
 ask() {
-    ASK_ERR="$BATS_TEST_TMPDIR/ask.err" PATH="$BATS_TEST_TMPDIR/bin:$PATH" bash -c \
-        'source lib/log.sh; source lib/answers.sh; source lib/apps.sh; '"$1"'; apps_ask >/dev/null 2>"$ASK_ERR"; echo "APPS=$(answers_get APPS)"; echo "LANGS=$(answers_get LANGS)"'
+    ASK_ERR="$BATS_TEST_TMPDIR/ask.err" NUSKU_TUI_IN="$BATS_TEST_TMPDIR/keys" \
+        NUSKU_TUI_OUT="$BATS_TEST_TMPDIR/screen" bash -c \
+        'source lib/log.sh; source lib/answers.sh; source lib/tui.sh; source lib/apps.sh; '"$1"'; apps_ask >/dev/null 2>"$ASK_ERR"; echo "APPS=$(answers_get APPS)"; echo "LANGS=$(answers_get LANGS)"'
 }
 
+# screen: the last frame drawn, without colour codes.
+screen() { sed 's/\x1b\[[0-9;?]*[a-zA-Z]//g' "$BATS_TEST_TMPDIR/screen"; }
+
 @test "fresh picker defaults to the starred apps" {
-    fake_gum Done
+    keys E N
     run ask ':'
     [ "$status" -eq 0 ]
     [ "${lines[0]}" = "APPS=neovim gh claude-code firefox discord obsidian spotify vlc" ]
     [ "${lines[1]}" = "LANGS=" ]
 }
 
-@test "group menu shows counts and Done" {
-    fake_gum Done
+@test "groups are folded with counts; Languages sits under Dev" {
+    keys E N
     run ask ':'
-    [ "$status" -eq 0 ]
-    grep -qxF 'Optional apps — pick a group to change, then Done' "$GUM_DIR/call-1"
-    grep -qxF 'Dev (3/6)' "$GUM_DIR/call-1"
-    grep -qxF 'Everyday (3/8)' "$GUM_DIR/call-1"
-    grep -qxF 'Done' "$GUM_DIR/call-1"
+    screen | grep -qE 'Dev +3/6'
+    screen | grep -qE 'Languages +0/10'
+    screen | grep -qE 'Everyday +3/12'
+    screen | grep -qE ' Done$'
+    [ "$(screen | grep -n 'Languages' | tail -1 | cut -d: -f1)" -eq "$(( $(screen | grep -n 'Dev ' | tail -1 | cut -d: -f1) + 1 ))" ]
+    ! screen | grep -q 'Neovim' || false
 }
 
-@test "opening Media and unticking Spotify" {
-    fake_gum 'Media (2/4)' '★ VLC' Done
+@test "Enter unfolds a group; Space unticks one app" {
+    # Media is the 4th row: open it, move to Spotify (first item), untick, Done.
+    keys D D D N D S E N
     run ask ':'
     [ "$status" -eq 0 ]
     [ "${lines[0]}" = "APPS=neovim gh claude-code firefox discord obsidian vlc" ]
-    grep -qxF 'Media — space toggles, ctrl+a selects all, enter confirms' "$GUM_DIR/call-2"
-    grep -qxF -- '--no-limit' "$GUM_DIR/call-2"
-    grep -qxF '★ Spotify,★ VLC' "$GUM_DIR/call-2"
 }
 
-@test "Dev opens the language picker" {
-    fake_gum 'Dev (3/6)' '★ Neovim (LazyVim)' $'Python\nRust' Done
+@test "Space on a group ticks all of it, then clears it" {
+    keys D D D S E N
     run ask ':'
-    [ "$status" -eq 0 ]
-    [[ "${lines[0]}" == "APPS=neovim "* ]]
-    [[ "${lines[0]}" != *" gh "* && "${lines[0]}" != *claude-code* ]]
-    [ "${lines[1]}" = "LANGS=python rust" ]
-    grep -qxF 'Languages — runtimes, tools and Neovim support' "$GUM_DIR/call-3"
+    [[ "${lines[0]}" == *" spotify vlc obs audacity" ]]
+    keys D D D S S E N
+    run ask ':'
+    [ "${lines[0]}" = "APPS=neovim gh claude-code firefox discord obsidian" ]
 }
 
-@test "Esc in a group keeps its selection" {
-    fake_gum 'Media (2/4)' ESC Done
+@test "languages are ticked in the same list" {
+    # Languages is the 2nd row: open it, tick Python (1st) and PHP (2nd).
+    keys D R D S D S E N
     run ask ':'
     [ "$status" -eq 0 ]
+    [ "${lines[1]}" = "LANGS=python php" ]
+}
+
+@test "Left on an app folds its group and moves to it" {
+    keys D D D N D L S E N
+    run ask ':'
+    # Left landed on Media (folded); Space then ticked the whole group.
+    [[ "${lines[0]}" == *" spotify vlc obs audacity" ]]
+}
+
+@test "Esc leaves without changes" {
+    keys D D D N D S X
+    run ask 'answers_set APPS "gimp spotify"'
+    [ "$status" -eq 0 ]
+    [ "${lines[0]}" = "APPS=spotify gimp" ]
+}
+
+@test "Esc on a fresh run keeps the starred apps" {
+    keys X
+    run ask ':'
     [ "${lines[0]}" = "APPS=neovim gh claude-code firefox discord obsidian spotify vlc" ]
 }
 
-@test "Esc in the group menu means Done" {
-    fake_gum ESC
-    run ask 'answers_set APPS gimp'
-    [ "$status" -eq 0 ]
-    [ "${lines[0]}" = "APPS=gimp" ]
-}
-
-@test "Ctrl+C in the group menu cancels the install" {
-    fake_gum CTRLC
+@test "Ctrl+C cancels the install" {
+    keys D D D N C
     run ask ':'
     [ "$status" -eq 1 ]
     grep -qx Cancelled "$BATS_TEST_TMPDIR/ask.err"
     [[ "$output" != *APPS=* ]]
-}
-
-@test "Ctrl+C in a group checklist cancels the install" {
-    fake_gum 'Media (2/4)' CTRLC Done
-    run ask ':'
-    [ "$status" -eq 1 ]
-    grep -qx Cancelled "$BATS_TEST_TMPDIR/ask.err"
-    [[ "$output" != *APPS=* ]]
-    [ ! -e "$GUM_DIR/call-3" ]
-}
-
-@test "Ctrl+C in the language checklist cancels the install" {
-    fake_gum 'Dev (3/6)' ESC CTRLC Done
-    run ask ':'
-    [ "$status" -eq 1 ]
-    grep -qx Cancelled "$BATS_TEST_TMPDIR/ask.err"
-    [ ! -e "$GUM_DIR/call-4" ]
 }
 
 @test "re-asking starts from saved picks" {
-    fake_gum Done
+    keys E N
     run ask "answers_set APPS gimp; answers_set LANGS go"
     [ "$status" -eq 0 ]
     [ "${lines[0]}" = "APPS=gimp" ]
     [ "${lines[1]}" = "LANGS=go" ]
-    grep -qxF 'Creative (1/5)' "$GUM_DIR/call-1"
-    grep -qxF 'Dev (0/6)' "$GUM_DIR/call-1"
+    screen | grep -qE 'Creative +1/5'
+    screen | grep -qE 'Dev +0/6'
+    screen | grep -qE 'Languages +1/10'
 }
 
 @test "snapper not offered on ext4" {
     export NUSKU_ROOT_FSTYPE=ext4
-    fake_gum 'System tools (0/5)' ESC Done
+    keys E U R E N
     run ask ':'
-    [ "$status" -eq 0 ]
-    grep -qxF 'System tools (0/5)' "$GUM_DIR/call-1"
-    run grep -c 'Snapper' "$GUM_DIR/call-2"
-    [ "$output" = 0 ]
-    grep -qF 'GParted' "$GUM_DIR/call-2"
+    screen | grep -qE 'System tools +0/7'
+    ! screen | grep -q Snapper || false
+    screen | grep -q GParted
 }
 
 @test "snapper offered on btrfs" {
     export NUSKU_ROOT_FSTYPE=btrfs
-    fake_gum 'System tools (0/6)' ESC Done
+    keys E U R E N
     run ask ':'
-    [ "$status" -eq 0 ]
-    grep -qF 'Snapper' "$GUM_DIR/call-2"
+    screen | grep -qE 'System tools +0/8'
+    screen | grep -q Snapper
 }
 
 @test "non-interactive without APPS installs no optional apps" {
@@ -309,28 +296,6 @@ ask() {
     [ "$status" -eq 0 ]
     [[ "$output" != *"No optional apps"* ]]
     [[ "$output" == *"APPS=[gimp] LANGS=[]"* ]]
-}
-
-@test "ticking None clears the group" {
-    fake_gum 'Media (2/4)' $'None\n★ VLC' Done
-    run ask ':'
-    [ "$status" -eq 0 ]
-    [ "${lines[0]}" = "APPS=neovim gh claude-code firefox discord obsidian" ]
-    grep -qxF None "$GUM_DIR/call-2"
-}
-
-@test "ticking None clears the languages" {
-    fake_gum 'Dev (3/6)' ESC $'None\nPython' Done
-    run ask 'answers_set LANGS "python rust"'
-    [ "$status" -eq 0 ]
-    [ "${lines[1]}" = "LANGS=" ]
-}
-
-@test "empty confirm clears the group" {
-    fake_gum 'Media (2/4)' '' Done
-    run ask ':'
-    [ "$status" -eq 0 ]
-    [ "${lines[0]}" = "APPS=neovim gh claude-code firefox discord obsidian" ]
 }
 
 # --- Installing the picks -------------------------------------------------------------
