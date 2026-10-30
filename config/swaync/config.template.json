@@ -98,12 +98,14 @@
           "update-command": "$HOME/.local/bin/nusku-quick status mic"
         },
         {
-          "label": "󰹑",
-          "command": "swaync-client -cp; sleep 0.3; hyprshot -m region -o ~/Pictures/Screenshots"
+          "label": "󰝟",
+          "type": "toggle",
+          "command": "$HOME/.local/bin/nusku-quick toggle sound",
+          "update-command": "$HOME/.local/bin/nusku-quick status sound"
         },
         {
-          "label": "󰸉",
-          "command": "swaync-client -cp; $HOME/.local/bin/nusku-menu-wallpaper"
+          "label": "󰹑",
+          "command": "swaync-client -cp; sleep 0.3; hyprshot -m region -o ~/Pictures/Screenshots"
         },
         {
           "label": "󰐥",
