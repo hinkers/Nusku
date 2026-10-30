@@ -1,0 +1,109 @@
+#!/usr/bin/env bash
+# nusku-menu-bluetooth: rofi Bluetooth picker (the ⌄ next to Bluetooth in quick settings).
+# Lists known devices; pick one to connect or disconnect. "Scan" finds new ones to pair.
+#   nusku-menu-bluetooth [--scan]
+set -uo pipefail
+
+SCAN_SECONDS="${NUSKU_BT_SCAN_SECONDS:-8}"
+
+menu() { rofi -dmenu -i -p "$1" -theme nusku "${@:2}"; }
+say() { notify-send -a Nusku -u low "$@" 2>/dev/null || true; }
+info() { bluetoothctl info "$1" 2>/dev/null; }
+field() { sed -n "s/^[[:space:]]*$1: //p" <<<"$2" | head -n1; }
+
+if ! bluetoothctl show 2>/dev/null | grep -q 'Powered: yes'; then
+    pick="$(printf '󰂯  Turn Bluetooth on\n' | menu "Bluetooth" -theme-str 'listview { lines: 1; }')" || exit 0
+    [ -n "$pick" ] || exit 0
+    rfkill unblock bluetooth 2>/dev/null
+    bluetoothctl power on >/dev/null 2>&1 || { say "Bluetooth" "Could not turn Bluetooth on"; exit 1; }
+    exec "$0" "$@"
+fi
+
+if [ "${1:-}" = --scan ]; then
+    say "Bluetooth" "Looking for devices for ${SCAN_SECONDS} seconds. Put yours in pairing mode."
+    bluetoothctl --timeout "$SCAN_SECONDS" scan on >/dev/null 2>&1
+fi
+
+device_icon() {
+    case "$1" in
+        audio-headset | audio-headphones) echo 󰋋 ;;
+        audio-card | audio-speaker) echo 󰓃 ;;
+        input-keyboard) echo 󰌌 ;;
+        input-mouse) echo 󰍽 ;;
+        input-gaming) echo 󰊴 ;;
+        phone) echo 󰏲 ;;
+        computer) echo 󰟀 ;;
+        *) echo 󰂯 ;;
+    esac
+}
+
+# Paired devices first (connected ones on top), then anything new a scan found.
+macs=() rows=() states=() active=()
+add() { # MAC STATE(connected|paired|new)
+    local i n
+    i="$(info "$1")"
+    n="$(field Name "$i")"
+    [ -n "$n" ] || n="$1"
+    local label="$n"
+    case "$2" in
+        connected) label="$n  ·  connected" ;;
+        new) label="$n  ·  pair" ;;
+    esac
+    [ "$2" = connected ] && active+=("${#rows[@]}")
+    macs+=("$1")
+    states+=("$2")
+    rows+=("$(device_icon "$(field Icon "$i")")  $label")
+}
+
+paired="$(bluetoothctl devices Paired 2>/dev/null | awk '{ print $2 }')"
+for state in connected paired; do
+    for mac in $paired; do
+        c="$(field Connected "$(info "$mac")")"
+        if { [ "$state" = connected ] && [ "$c" = yes ]; } || { [ "$state" = paired ] && [ "$c" != yes ]; }; then
+            add "$mac" "$state"
+        fi
+    done
+done
+while read -r _ mac name; do
+    case " $paired " in *"$mac"*) continue ;; esac
+    # Unnamed devices show only their address (name = MAC with dashes); not worth listing.
+    [ "$name" = "${mac//:/-}" ] && continue
+    add "$mac" new
+done < <(bluetoothctl devices 2>/dev/null)
+
+n=${#rows[@]}
+extra=("󰂰  Scan for devices" "󰒓  Bluetooth settings")
+args=(-format i)
+[ ${#active[@]} -gt 0 ] && args+=(-a "$(IFS=,; echo "${active[*]}")")
+idx="$( { [ "$n" -gt 0 ] && printf '%s\n' "${rows[@]}"; printf '%s\n' "${extra[@]}"; } |
+    menu "Bluetooth" "${args[@]}")" || exit 0
+[ -n "$idx" ] || exit 0
+
+if [ "$idx" -eq "$n" ]; then
+    exec "$0" --scan
+elif [ "$idx" -eq $((n + 1)) ]; then
+    exec blueman-manager
+fi
+
+mac="${macs[$idx]}"
+name="$(field Name "$(info "$mac")")"
+name="${name:-$mac}"
+case "${states[$idx]}" in
+    connected)
+        bluetoothctl disconnect "$mac" >/dev/null 2>&1 && say "Bluetooth" "Disconnected $name" ;;
+    paired)
+        say "Bluetooth" "Connecting $name…"
+        if bluetoothctl connect "$mac" >/dev/null 2>&1; then
+            say "Bluetooth" "Connected $name"
+        else
+            say "Bluetooth" "Could not connect $name. Is it on and nearby?"
+        fi ;;
+    new)
+        say "Bluetooth" "Pairing $name…"
+        if bluetoothctl pair "$mac" >/dev/null 2>&1 && bluetoothctl trust "$mac" >/dev/null 2>&1 &&
+            bluetoothctl connect "$mac" >/dev/null 2>&1; then
+            say "Bluetooth" "Connected $name"
+        else
+            say "Bluetooth" "Could not pair $name. Devices that need a PIN pair from Bluetooth settings."
+        fi ;;
+esac

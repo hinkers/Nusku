@@ -1,0 +1,85 @@
+#!/usr/bin/env bash
+# nusku-menu-wifi: rofi Wi-Fi picker (the ⌄ next to Wi-Fi in quick settings).
+# Lists nearby networks (strongest first); pick one to connect, the connected one to disconnect.
+set -uo pipefail
+
+menu() { rofi -dmenu -i -p "$1" -theme nusku "${@:2}"; }
+say() { notify-send -a Nusku -u low "$@" 2>/dev/null || true; }
+
+if [ "$(nmcli radio wifi 2>/dev/null)" != enabled ]; then
+    pick="$(printf '󰖩  Turn Wi-Fi on\n' | menu "Wi-Fi" -theme-str 'listview { lines: 1; }')" || exit 0
+    [ -n "$pick" ] && nmcli radio wifi on && say "Wi-Fi" "Turned on. Scanning for networks…" && sleep 3 && exec "$0"
+    exit 0
+fi
+
+signal_icon() {
+    if [ "$1" -ge 75 ]; then echo 󰤨
+    elif [ "$1" -ge 50 ]; then echo 󰤥
+    elif [ "$1" -ge 25 ]; then echo 󰤢
+    else echo 󰤟
+    fi
+}
+
+# IN-USE:SSID:SIGNAL:SECURITY, colons inside an SSID escaped as \:. Keep each SSID's best row.
+ssids=() secure=() rows=() active=""
+declare -A seen=()
+while IFS=$'\x1f' read -r inuse ssid signal security; do
+    [ -n "$ssid" ] && [ -z "${seen[$ssid]:-}" ] || continue
+    seen[$ssid]=1
+    lock=""
+    [ -n "$security" ] && [ "$security" != "--" ] && lock="  󰌾"
+    [ "$inuse" = "*" ] && active="${#ssids[@]}"
+    ssids+=("$ssid")
+    secure+=("$([ -n "$lock" ] && echo 1 || echo 0)")
+    rows+=("$(signal_icon "$signal")  $ssid$lock")
+done < <(nmcli -t -f IN-USE,SSID,SIGNAL,SECURITY dev wifi list --rescan auto 2>/dev/null |
+    sed 's/\\:/\x1e/g' | awk -F: -v OFS='\037' '{ gsub("\x1e", ":", $2); print $1, $2, $3, $4 }' |
+    sort -t$'\x1f' -k3,3nr)
+
+n=${#rows[@]}
+extra=("󰑐  Scan again" "󰒓  Network settings")
+args=(-format i)
+[ -n "$active" ] && args+=(-a "$active")
+idx="$( { printf '%s\n' "${rows[@]}"; printf '%s\n' "${extra[@]}"; } |
+    menu "Wi-Fi" "${args[@]}")" || exit 0
+[ -n "$idx" ] || exit 0
+
+if [ "$idx" -eq "$n" ]; then
+    nmcli dev wifi rescan 2>/dev/null
+    sleep 3
+    exec "$0"
+elif [ "$idx" -eq $((n + 1)) ]; then
+    exec kitty --class nusku-nmtui -e nmtui
+fi
+
+ssid="${ssids[$idx]}"
+if [ "$idx" = "$active" ]; then
+    dev="$(nmcli -t -f DEVICE,TYPE dev | awk -F: '$2 == "wifi" { print $1; exit }')"
+    nmcli dev disconnect "$dev" >/dev/null 2>&1 && say "Wi-Fi" "Disconnected from $ssid"
+    exit 0
+fi
+
+# A saved network connects with its stored password.
+if nmcli -t -f NAME,TYPE con show | grep -qxF "$ssid:802-11-wireless"; then
+    if nmcli con up id "$ssid" >/dev/null 2>&1; then
+        say "Wi-Fi" "Connected to $ssid"
+    else
+        say "Wi-Fi" "Could not connect to $ssid"
+    fi
+    exit 0
+fi
+
+pw=()
+if [ "${secure[$idx]}" = 1 ]; then
+    pass="$(menu "Password" -password -theme-str 'listview { lines: 0; } entry { placeholder: ""; }' </dev/null)" || exit 0
+    [ -n "$pass" ] || exit 0
+    pw=(password "$pass")
+fi
+say "Wi-Fi" "Connecting to $ssid…"
+if nmcli dev wifi connect "$ssid" "${pw[@]}" >/dev/null 2>&1; then
+    say "Wi-Fi" "Connected to $ssid"
+else
+    # Don't keep a saved network with a wrong password.
+    nmcli con delete id "$ssid" >/dev/null 2>&1
+    say "Wi-Fi" "Could not connect to $ssid. Check the password and try again."
+fi

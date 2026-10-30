@@ -45,8 +45,8 @@
           "update-command": "$HOME/.local/bin/nusku-quick status wifi"
         },
         {
-          "label": "󰅀",
-          "command": "swaync-client -cp; kitty --class nusku-nmtui -e nmtui"
+          "label": "󱘖",
+          "command": "swaync-client -cp; $HOME/.local/bin/nusku-menu-wifi"
         },
         {
           "label": "󰂯   Bluetooth",
@@ -55,8 +55,8 @@
           "update-command": "$HOME/.local/bin/nusku-quick status bluetooth"
         },
         {
-          "label": "󰅀",
-          "command": "swaync-client -cp; blueman-manager"
+          "label": "󱘖",
+          "command": "swaync-client -cp; $HOME/.local/bin/nusku-menu-bluetooth"
         }
       ]
     },
