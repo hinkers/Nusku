@@ -74,6 +74,8 @@ group|system|System tools
 app|system|yazi|-|Yazi|yazi ffmpeg 7zip poppler resvg chafa|
 app|system|flatpak|-|Flatpak|flatpak|
 app|system|snapper|-|Snapper|snapper snap-pac grub-btrfs inotify-tools|btrfs
+app|system|remmina|-|Remmina (VNC and RDP viewer)|remmina libvncserver freerdp libsecret|
+app|system|wayvnc|-|wayvnc (share this screen over VNC)|wayvnc|
 app|system|gparted|-|GParted|gparted|
 app|system|ufw|-|UFW firewall|ufw|
 app|system|pokemon|-|Pokémon in fastfetch|aur:krabby-bin|

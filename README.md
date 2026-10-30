@@ -30,11 +30,13 @@ The installer asks which extra apps to install, group by group (a `None` item cl
 | Creative | GIMP, Krita, Inkscape, Kdenlive, Blender |
 | ArtCraft | PhotoCraft, VectorCraft, FilmCraft, LightCraft, PdfCraft, EffectCraft, DesignCraft, FigCraft, WordCraft, SoundCraft, DeckCraft, CADCraft, GridCraft |
 | Gaming | Steam, Lutris, Heroic, Parsec (client), GameMode, MangoHud, ProtonUp-Qt, Wine (multilib is enabled when needed) |
-| System tools | Yazi, Flatpak, Snapper (btrfs roots only), GParted, UFW firewall, Pokémon in fastfetch |
+| System tools | Yazi, Flatpak, Snapper (btrfs roots only), Remmina (VNC and RDP viewer), wayvnc (VNC server), GParted, UFW firewall, Pokémon in fastfetch |
 
 Pick at least one browser from Everyday. If web links have no default yet, the first browser you picked becomes the default, and `Super + B` opens it. With no browser picked, the summary warns that links won't open.
 
 Every new terminal greets you with fastfetch (Arch logo, Nerd Font icons, Catppuccin colours). Tick **Pokémon in fastfetch** (System tools) to swap the logo for a random Gen 1-3 Pokémon from [krabby](https://github.com/yannjor/krabby); shinies show up at krabby's default 1/128. Turn it on later with `./install.sh --apps`. Unticking it later does not uninstall krabby, so the Pokémon stays until you remove the `krabby-bin` package. Nusku ships no Pokémon art.
+
+Remote desktop: **Remmina** connects to other machines over VNC or RDP (Windows Remote Desktop); **Parsec** (Gaming) connects to Parsec hosts. **wayvnc** shares this screen. Run `wayvnc` when you want it; it listens on this machine only (`127.0.0.1:5900`), so connect through an SSH tunnel (`ssh -L 5900:localhost:5900 you@this-pc`, then point the viewer at `localhost`). Before letting it listen on your network (`wayvnc 0.0.0.0`), turn on a password and TLS in `~/.config/wayvnc/config` (see `man wayvnc`), because plain VNC is unencrypted.
 
 The language picker opens right after the Dev group's checklist: Python, PHP, GDScript, JavaScript/TypeScript, Rust, Go, C/C++, C#, Java, Lua. Each installs its runtime and package manager; the Neovim language server, formatter and parser come from LazyVim. Esc leaves a checklist unchanged; Ctrl+C cancels the install.
 
