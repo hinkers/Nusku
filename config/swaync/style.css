@@ -379,6 +379,47 @@ scrollbar trough {
   color: @accent;
 }
 
+/* Volume grows when its per-app list opens, so it is a rounded card rather than a pill. */
+.widget-volume {
+  border-radius: 22px;
+}
+
+.widget-volume > box > button {
+  min-width: 28px;
+  min-height: 28px;
+  margin-right: 6px;
+  border-radius: 999px;
+  color: @subtext0;
+}
+
+.widget-volume > box > button:hover {
+  background-color: @surface0;
+  color: @text;
+}
+
+.widget-volume > box > button label {
+  font-size: 1rem;
+  padding: 0;
+}
+
+.per-app-volume {
+  margin: 6px 6px 0;
+  padding: 4px 0;
+  border-radius: 16px;
+  background-color: @base;
+}
+
+.per-app-volume label {
+  color: @subtext0;
+  font-size: 0.9rem;
+  padding: 6px 12px;
+}
+
+.per-app-volume row image {
+  -gtk-icon-size: 20px;
+  margin-left: 10px;
+}
+
 .widget-backlight trough,
 .widget-volume trough {
   min-height: 10px;
