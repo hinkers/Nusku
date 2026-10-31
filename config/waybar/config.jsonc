@@ -25,16 +25,9 @@
 
   "clock": {
     "format": "{:%a %d %b  %H:%M}",
-    "tooltip-format": "<tt>{calendar}</tt>",
+    "tooltip": false,
     // Click: the drop-down calendar (scripts/nusku-calendar); click again to close.
-    "on-click": "~/.local/bin/nusku-calendar",
-    "calendar": {
-      "mode": "month",
-      "format": {
-        "months": "<b>{}</b>",
-        "today": "<b><u>{}</u></b>"
-      }
-    }
+    "on-click": "~/.local/bin/nusku-calendar"
   },
 
   "tray": {
