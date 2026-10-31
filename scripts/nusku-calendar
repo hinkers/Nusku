@@ -48,7 +48,8 @@ COLORS = os.path.expanduser("~/.config/nusku/theme/colors.css")
 WEEKDAYS = ["Mo", "Tu", "We", "Th", "Fr", "Sa", "Su"]
 
 CSS = """
-window.nusku-catcher { background: transparent; }
+/* Fully transparent windows are never shown, so the click-catcher is 1% black (invisible). */
+window.nusku-catcher { background: rgba(0, 0, 0, 0.01); }
 window.nusku-calendar { background: transparent; }
 .panel {
   background-color: @base; color: @text; border-radius: 18px; padding: 14px;
@@ -69,7 +70,7 @@ button.day { border-radius: 999px; min-width: 38px; min-height: 38px; padding: 0
 button.day.other { color: @overlay0; }
 button.day.selected { box-shadow: inset 0 0 0 2px @accent; }
 button.day.today { background-color: @accent; color: @crust; font-weight: bold; }
-.dot { color: @accent; font-size: 9px; margin-top: -4px; }
+.dot { color: @accent; font-size: 7px; margin-bottom: 3px; }
 button.day.today .dot { color: @crust; }
 .dayhead { color: @subtext0; font-weight: bold; font-size: 12px; margin-top: 10px; }
 button.event { background-color: @mantle; border-radius: 12px; padding: 8px 10px; }
@@ -327,11 +328,13 @@ class CalendarApp(Gtk.Application):
         first, _ = self._grid_range()
         for i in range(42):
             day = first + datetime.timedelta(days=i)
-            box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, valign=Gtk.Align.CENTER)
-            box.append(Gtk.Label(label=str(day.day)))
-            dot = Gtk.Label(label="●" if self.days.get(day) else " ")
-            dot.add_css_class("dot")
-            box.append(dot)
+            # The number stays centred; the event dot floats at the bottom of the circle.
+            box = Gtk.Overlay()
+            box.set_child(Gtk.Label(label=str(day.day), halign=Gtk.Align.CENTER, valign=Gtk.Align.CENTER))
+            if self.days.get(day):
+                dot = Gtk.Label(label="●", halign=Gtk.Align.CENTER, valign=Gtk.Align.END)
+                dot.add_css_class("dot")
+                box.add_overlay(dot)
             b = Gtk.Button(child=box)
             b.add_css_class("day")
             if day.month != self.shown.month:
