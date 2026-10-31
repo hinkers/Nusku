@@ -28,6 +28,7 @@ app|everyday|discord|*|Discord|discord|
 app|everyday|obsidian|*|Obsidian|obsidian|
 app|everyday|libreoffice|-|LibreOffice|libreoffice-fresh|
 app|everyday|thunderbird|-|Thunderbird|thunderbird|
+app|everyday|calendar|-|GNOME Calendar (Google and Nextcloud sync)|gnome-calendar gnome-online-accounts-gtk gnome-keyring|
 app|everyday|bitwarden|-|Bitwarden|flatpak:com.bitwarden.desktop|
 app|everyday|zathura|-|Zathura|zathura zathura-pdf-mupdf|
 app|everyday|localsend|-|LocalSend|aur:localsend-bin|

@@ -24,6 +24,14 @@ hl.window_rule({
     size = "720 520",
     center = true,
 })
+-- GNOME Calendar opens from the clock, so it floats just under the bar, centred.
+hl.window_rule({
+    name = "nusku-float-calendar",
+    match = { class = [[^(org\.gnome\.Calendar)$]] },
+    float = true,
+    size = "760 560",
+    move = "((monitor_w*0.5)-(window_w*0.5)) 46",
+})
 -- File chooser portal dialogs.
 hl.window_rule({
     name = "nusku-float-file-chooser",

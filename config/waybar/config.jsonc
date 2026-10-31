@@ -26,6 +26,8 @@
   "clock": {
     "format": "{:%a %d %b  %H:%M}",
     "tooltip-format": "<tt>{calendar}</tt>",
+    // Click: GNOME Calendar under the clock (click again to close). Hover still shows the month.
+    "on-click": "~/.local/bin/nusku-calendar",
     "calendar": {
       "mode": "month",
       "format": {

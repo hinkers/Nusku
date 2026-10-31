@@ -417,6 +417,12 @@ apps_hook_sunshine() {
     NUSKU_APP_NOTES+=("Sunshine starts at login. Open https://localhost:47990 on this PC to create its login, then pair Moonlight with the PIN it shows.")
 }
 
+# apps_hook_calendar: online accounts keep their logins in the GNOME keyring, which unlocks
+# with the login password (SDDM's PAM config already starts it).
+apps_hook_calendar() {
+    NUSKU_APP_NOTES+=("GNOME Calendar: log out and back in once (so the keyring is unlocked), then open Online Accounts to add Google or Nextcloud. Click the clock to open the calendar.")
+}
+
 apps_hook_flatpak() {
     pkg_flathub_remote
 }

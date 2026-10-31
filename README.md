@@ -31,7 +31,7 @@ Apps are one list: each group is a header with its apps indented underneath, fol
 | Group | Apps |
 | --- | --- |
 | Dev | Neovim (LazyVim) ★, GitHub CLI ★, Claude Code ★, lazygit, Docker + Compose, VS Code |
-| Everyday | Firefox ★, Chromium, Brave, Zen Browser, LibreWolf (Flatpak), Discord ★, Obsidian ★, LibreOffice, Thunderbird, Bitwarden (Flatpak), Zathura, LocalSend |
+| Everyday | Firefox ★, Chromium, Brave, Zen Browser, LibreWolf (Flatpak), Discord ★, Obsidian ★, LibreOffice, Thunderbird, GNOME Calendar, Bitwarden (Flatpak), Zathura, LocalSend |
 | Media | Spotify ★, VLC ★, OBS Studio, Audacity |
 | Creative | GIMP, Krita, Inkscape, Kdenlive, Blender |
 | ArtCraft | PhotoCraft, VectorCraft, FilmCraft, LightCraft, PdfCraft, EffectCraft, DesignCraft, FigCraft, WordCraft, SoundCraft, DeckCraft, CADCraft, GridCraft |
@@ -91,6 +91,7 @@ Any of the 14 Catppuccin accents works: rosewater flamingo pink mauve red maroon
 ## Top bar and app launcher
 
 - The right of the bar is the tray, the battery and one pill with the network, Bluetooth and notification icons. Click the pill (or press Super + N) for quick settings. Right-click the network icon to pick a Wi-Fi network, the Bluetooth icon to connect a device, or the bell to toggle Do Not Disturb. Hover them for the network name and connected devices.
+- Hover the clock for this month; click it to open **GNOME Calendar** under it (click again to close). Pick GNOME Calendar in Everyday to get it. To see your Google or Nextcloud events, log out and back in once after installing it (so the GNOME keyring is unlocked with your login), open **Online Accounts** from the launcher and add the account; its calendars show up in GNOME Calendar.
 - Quick settings: Wi-Fi and Bluetooth (split buttons: the left part turns it on or off; the plug opens a picker to join a network, or to connect, disconnect and pair Bluetooth devices, with "Scan" to find new ones), then Do Not Disturb, night light, airplane mode, keep awake (pauses screen lock and sleep until the next login) sound mute and mic mute; then screenshot and power menu. The volume slider follows the default output: while a Moonlight stream is open, Sunshine moves sound to its own virtual output, and the slider will not track your speakers until the stream ends (in Moonlight, quit the session rather than just closing the window). Below them: brightness (laptops), volume (the arrow opens per-app volume), power mode, the media player and your notifications. The panel layout is `config/swaync/config.template.json`; the installer writes `~/.config/swaync/config.json` from it on every install and update, leaving out the brightness slider on machines without a backlight and power modes the machine does not offer.
 - The app launcher hides developer and system tools (Qt tools, xgps, Rofi, theme tools) and gives a few apps a Papirus icon so they match. The list is `config/applications/overrides.list`; the tweaks live in `~/.local/share/applications` and are refreshed on every update. A `.desktop` file you put there yourself always wins.
 

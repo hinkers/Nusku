@@ -196,7 +196,7 @@ screen() { sed 's/\x1b\[[0-9;?]*[a-zA-Z]//g' "$BATS_TEST_TMPDIR/screen"; }
     run ask ':'
     screen | grep -qE 'Dev +3/6'
     screen | grep -qE 'Languages +0/10'
-    screen | grep -qE 'Everyday +3/12'
+    screen | grep -qE 'Everyday +3/13'
     screen | grep -qE ' Done$'
     [ "$(screen | grep -n 'Languages' | tail -1 | cut -d: -f1)" -eq "$(( $(screen | grep -n 'Dev ' | tail -1 | cut -d: -f1) + 1 ))" ]
     ! screen | grep -q 'Neovim' || false
@@ -498,6 +498,13 @@ in_hooks() {
     grep -q 'sudo ufw default deny incoming' "$CALLS"
     grep -q 'sudo ufw default allow outgoing' "$CALLS"
     ! grep -q 53317 "$CALLS" || false
+}
+
+@test "calendar hook explains the keyring and Online Accounts" {
+    hook_stubs
+    run in_hooks "answers_set APPS 'calendar firefox'; apps_run_hooks; apps_summary_notes"
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"open Online Accounts to add Google or Nextcloud"* ]]
 }
 
 @test "sunshine hook starts it at login and explains pairing" {

@@ -1,0 +1,12 @@
+#!/usr/bin/env bash
+# nusku-calendar: click the clock to open GNOME Calendar under it; click again to close it.
+set -uo pipefail
+
+class="org.gnome.Calendar"
+if hyprctl clients -j 2>/dev/null | jq -e --arg c "$class" 'any(.[]; .class == $c)' >/dev/null; then
+    hyprctl dispatch "hl.dsp.window.close({ window = \"class:^${class//./\\\\.}\$\" })" >/dev/null
+elif command -v gnome-calendar >/dev/null 2>&1; then
+    setsid -f gnome-calendar >/dev/null 2>&1 </dev/null
+else
+    notify-send -a Nusku "Calendar" "Add GNOME Calendar with ./install.sh --apps (Everyday group)." 2>/dev/null || true
+fi
