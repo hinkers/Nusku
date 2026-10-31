@@ -43,6 +43,8 @@ gvfs
 tumbler
 brightnessctl
 hyprsunset   # night light toggle in quick settings
+python-gobject   # the clock's drop-down calendar (scripts/nusku-calendar)
+gtk4-layer-shell   # lets it sit over the bar like the panels
 playerctl
 xdg-user-dirs
 
